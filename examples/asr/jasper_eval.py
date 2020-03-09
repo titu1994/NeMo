@@ -69,6 +69,8 @@ def main():
     )
     parser.add_argument("--beam_width", default=128, type=int)
 
+    parser.add_argument('--kernel_size_factor', default=1.0, type=float)
+
     args = parser.parse_args()
     batch_size = args.batch_size
     load_dir = args.load_dir
@@ -119,6 +121,12 @@ def main():
     data_preprocessor = nemo_asr.AudioToMelSpectrogramPreprocessor(
         sample_rate=sample_rate, **jasper_params["AudioToMelSpectrogramPreprocessor"]
     )
+
+    # Inject the `kernel_size_factor` kwarg to the QuartzNet config
+    # Skip the last layer  as that must be a pointwise kernel
+    for idx in range(len(jasper_params["JasperEncoder"]["jasper"]) - 1):
+        jasper_params["JasperEncoder"]["jasper"][idx]["kernel_size_factor"] = args.kernel_size_factor
+
     jasper_encoder = nemo_asr.JasperEncoder(
         feat_in=jasper_params["AudioToMelSpectrogramPreprocessor"]["features"], **jasper_params["JasperEncoder"]
     )
