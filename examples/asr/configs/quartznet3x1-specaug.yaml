@@ -1,6 +1,6 @@
 model: "QuartzNet"
 sample_rate: 16000
-rep: 1
+repeat: &rep 1
 
 AudioToTextDataLayer:
     max_duration: 16.7
