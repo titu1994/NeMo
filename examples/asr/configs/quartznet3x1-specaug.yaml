@@ -34,7 +34,6 @@ SpectrogramAugmentation:
     rect_freq: 50
 
 JasperEncoder:
-    feat_in: 64
     activation: "relu"
     conv_mask: true
 
