@@ -1,6 +1,7 @@
 model: "QuartzNet"
 sample_rate: 16000
-repeat: &rep 1
+repeat: &rep 5
+dropout: &drop 0.0
 
 AudioToTextDataLayer:
     max_duration: 16.7
@@ -27,8 +28,8 @@ AudioToMelSpectrogramPreprocessor:
 SpectrogramAugmentation:
     freq_masks: 2
     time_masks: 2
-    freq_width: 15
-    time_width: 25
+    freq_width: 120
+    time_width: 50
     rect_masks: 5
     rect_time: 120
     rect_freq: 50
@@ -38,7 +39,7 @@ JasperEncoder:
     conv_mask: true
 
     jasper:
-        - filters: 128
+        - filters: 256
           repeat: 1
           kernel: [11]
           stride: [1]
@@ -52,7 +53,16 @@ JasperEncoder:
           kernel: [13]
           stride: [1]
           dilation: [1]
-          dropout: 0.0
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [13]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
           residual: true
           separable: true
 
@@ -61,7 +71,16 @@ JasperEncoder:
           kernel: [15]
           stride: [1]
           dilation: [1]
-          dropout: 0.0
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [15]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
           residual: true
           separable: true
 
@@ -70,7 +89,52 @@ JasperEncoder:
           kernel: [17]
           stride: [1]
           dilation: [1]
-          dropout: 0.0
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [17]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [19]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [19]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [21]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
+          residual: true
+          separable: true
+
+        - filters: 64
+          repeat: *rep
+          kernel: [21]
+          stride: [1]
+          dilation: [1]
+          dropout: *drop
           residual: true
           separable: true
 
