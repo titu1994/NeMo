@@ -243,12 +243,21 @@ def create_all_dags(args, neural_factory):
         # create corresponding eval callback
         tagname = os.path.basename(args.eval_datasets[i]).split(".")[0]
 
+        if args.project is not None:
+            wandb_name = args.exp_name
+            wandb_project = args.project
+        else:
+            wandb_name = None
+            wandb_project = None
+
         eval_callback = nemo.core.EvaluatorCallback(
             eval_tensors=[loss_e, predictions_e, transcript_e, transcript_len_e,],
             user_iter_callback=partial(process_evaluation_batch, labels=vocab),
             user_epochs_done_callback=partial(process_evaluation_epoch, tag=tagname),
             eval_step=args.eval_freq,
             tb_writer=neural_factory.tb_writer,
+            wandb_name=wandb_name,
+            wandb_project=wandb_project
         )
 
         callbacks.append(eval_callback)
