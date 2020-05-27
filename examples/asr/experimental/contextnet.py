@@ -320,7 +320,7 @@ def main():
             "betas": (args.beta1, args.beta2),
             "weight_decay": args.weight_decay,
             "grad_norm_clip": None,
-            "amp_min_loss_scale": 1e-4,
+            "amp_min_loss_scale": 1e-8,
         },
         batches_per_step=args.iter_per_step,
         synced_batchnorm=args.synced_bn,
