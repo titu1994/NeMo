@@ -199,7 +199,7 @@ ContextNetEncoder:
         -   filters: 384
             repeat: *repeat
             kernel: [39]
-            stride: [*stride]
+            stride: [1]
             dilation: [1]
             dropout: *dropout
             residual: true
