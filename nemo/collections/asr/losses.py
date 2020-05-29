@@ -58,7 +58,7 @@ class CTCLossNM(LossNM):
 
         log_probs = log_probs.transpose(1, 0)  # [T, B, D]
 
-        if log_probs.shape[0] != max_input_len:
+        if (log_probs.shape[0] - max_input_len) > 1:
             log_probs = log_probs[:max_input_len, :, :]
 
         loss = self._criterion(log_probs, targets, input_length, target_length)
