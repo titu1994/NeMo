@@ -54,7 +54,14 @@ class CTCLossNM(LossNM):
         input_length = input_length.long()
         target_length = target_length.long()
         targets = targets.long()
-        loss = self._criterion(log_probs.transpose(1, 0), targets, input_length, target_length)
+        max_input_len = input_length.max()
+
+        log_probs = log_probs.transpose(1, 0)  # [T, B, D]
+
+        if log_probs.shape[0] != max_input_len:
+            log_probs = log_probs[:max_input_len, :, :]
+
+        loss = self._criterion(log_probs, targets, input_length, target_length)
         # note that this is different from reduction = 'mean'
         # because we are not dividing by target lengths
         loss = torch.mean(loss)
