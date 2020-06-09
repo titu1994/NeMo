@@ -323,16 +323,17 @@ class JasperBlock(nn.Module):
         if upsample_last:
             conv.extend(
                 [
-                    nn.ConvTranspose1d(
-                        inplanes_loop,
-                        inplanes_loop,
-                        kernel_size=kernel_size[0] + 1,  # even kernel is better for transpose
-                        stride=2,
-                        padding=padding_val,
-                        groups=inplanes_loop,
-                        bias=False,
-                    ),
-                    activation,
+                    nn.UpsamplingNearest2d(scale_factor=2.0),
+                    # nn.ConvTranspose1d(
+                    #     inplanes_loop,
+                    #     inplanes_loop,
+                    #     kernel_size=kernel_size[0] + 1,  # even kernel is better for transpose
+                    #     stride=2,
+                    #     padding=padding_val,
+                    #     groups=inplanes_loop,
+                    #     bias=False,
+                    # ),
+                    # activation,
                 ]
             )
 
@@ -384,11 +385,12 @@ class JasperBlock(nn.Module):
 
                 if upsample_last:
                     res.extend([
-                        nn.ConvTranspose1d(
-                            planes, planes, kernel_size[0] + 1, stride=2, padding=padding_val, groups=planes,
-                            bias=False,
-                        ),
-                        activation,
+                        nn.UpsamplingNearest2d(scale_factor=2.0),
+                        # nn.ConvTranspose1d(
+                        #     planes, planes, kernel_size[0] + 1, stride=2, padding=padding_val, groups=planes,
+                        #     bias=False,
+                        # ),
+                        # activation,
                     ])
 
                 res.extend(
