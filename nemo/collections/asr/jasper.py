@@ -74,6 +74,8 @@ class JasperEncoder(TrainableNM):
                     'stride_last' (bool) # Bool flag to determine whether each
                         # of the the repeated sub-blockss will perform a stride,
                         # or only the last sub-block will perform a strided convolution.
+                    'upsample_last' (bool) # Bool flag to determine whether
+                        # the last of the repeated sub-blocks will perform an upsample op.
                 }
 
         activation (str): Activation function used for each sub-blocks. Can be
@@ -187,6 +189,7 @@ class JasperEncoder(TrainableNM):
             se_interpolation_mode = lcfg.get('se_interpolation_mode', 'nearest')
             kernel_size_factor = lcfg.get('kernel_size_factor', 1.0)
             stride_last = lcfg.get('stride_last', False)
+            upsample_last = lcfg.get('upsample_last', False)
             encoder_layers.append(
                 JasperBlock(
                     feat_in,
@@ -212,6 +215,7 @@ class JasperEncoder(TrainableNM):
                     se_interpolation_mode=se_interpolation_mode,
                     kernel_size_factor=kernel_size_factor,
                     stride_last=stride_last,
+                    upsample_last=upsample_last,
                 )
             )
             feat_in = lcfg['filters']

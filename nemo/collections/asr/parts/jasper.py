@@ -270,6 +270,7 @@ class JasperBlock(nn.Module):
         se_context_window=None,
         se_interpolation_mode='nearest',
         stride_last=False,
+        upsample_last=False,
     ):
         super(JasperBlock, self).__init__()
 
@@ -287,6 +288,7 @@ class JasperBlock(nn.Module):
         self.separable = separable
         self.residual_mode = residual_mode
         self.se = se
+        self.upsample_last = upsample_last
 
         inplanes_loop = inplanes
         conv = nn.ModuleList()
@@ -317,6 +319,22 @@ class JasperBlock(nn.Module):
             conv.extend(self._get_act_dropout_layer(drop_prob=dropout, activation=activation))
 
             inplanes_loop = planes
+
+        if upsample_last:
+            conv.extend(
+                [
+                    nn.ConvTranspose1d(
+                        inplanes_loop,
+                        inplanes_loop,
+                        kernel_size=kernel_size[0] + 1,  # even kernel is better for transpose
+                        stride=2,
+                        padding=padding_val,
+                        groups=groups,
+                        bias=False,
+                    ),
+                    activation,
+                ]
+            )
 
         conv.extend(
             self._get_conv_bn_layer(
@@ -362,7 +380,18 @@ class JasperBlock(nn.Module):
                 res_panes = [inplanes]
                 self.dense_residual = False
             for ip in res_panes:
-                res = nn.ModuleList(
+                res = nn.ModuleList()
+
+                if upsample_last:
+                    res.extend([
+                        nn.ConvTranspose1d(
+                            planes, planes, kernel_size[0] + 1, stride=2, padding=padding_val, groups=groups,
+                            bias=False,
+                        ),
+                        activation,
+                    ])
+
+                res.extend(
                     self._get_conv_bn_layer(
                         ip,
                         planes,
@@ -370,8 +399,7 @@ class JasperBlock(nn.Module):
                         normalization=normalization,
                         norm_groups=norm_groups,
                         stride=stride_val,
-                    )
-                )
+                    ))
 
                 res_list.append(res)
 
@@ -533,6 +561,9 @@ class JasperBlock(nn.Module):
                     out = out + res_out
                 else:
                     out = torch.max(out, res_out)
+
+        if self.upsample_last:
+            lens = 2 * lens
 
         # compute the output
         out = self.mout(out)
