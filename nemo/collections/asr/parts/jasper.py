@@ -329,7 +329,7 @@ class JasperBlock(nn.Module):
                         kernel_size=kernel_size[0] + 1,  # even kernel is better for transpose
                         stride=2,
                         padding=padding_val,
-                        groups=groups,
+                        groups=inplanes_loop,
                         bias=False,
                     ),
                     activation,
@@ -385,7 +385,7 @@ class JasperBlock(nn.Module):
                 if upsample_last:
                     res.extend([
                         nn.ConvTranspose1d(
-                            planes, planes, kernel_size[0] + 1, stride=2, padding=padding_val, groups=groups,
+                            planes, planes, kernel_size[0] + 1, stride=2, padding=padding_val, groups=planes,
                             bias=False,
                         ),
                         activation,
