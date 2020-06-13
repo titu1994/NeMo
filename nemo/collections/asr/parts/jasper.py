@@ -289,6 +289,7 @@ class JasperBlock(nn.Module):
         self.separable = separable
         self.residual_mode = residual_mode
         self.se = se
+        self.stride_first = stride_first
         self.upsample_last = upsample_last
 
         inplanes_loop = inplanes
@@ -297,12 +298,16 @@ class JasperBlock(nn.Module):
         if stride_first and stride_last:
             raise ValueError("Can only have either `stride_first` or `stride_last` !")
 
+        self.stride_first_val = stride[0]
         if stride_first and stride[0] > 1:
+            # override stride value
+            stride[0] = 1
+
             conv.append(nn.AvgPool1d(2))
 
         for _ in range(repeat - 1):
             # Stride last means only the last convolution in block will have stride
-            if stride_last:
+            if stride_last or stride_first:
                 stride_val = [1]
             else:
                 stride_val = stride
@@ -380,7 +385,10 @@ class JasperBlock(nn.Module):
             res_list = nn.ModuleList()
 
             if residual_mode == 'stride_add':
-                stride_val = stride
+                if stride_first:
+                    stride_val = self.stride_first_val
+                else:
+                    stride_val = stride
             else:
                 stride_val = [1]
 
@@ -570,6 +578,9 @@ class JasperBlock(nn.Module):
                     out = out + res_out
                 else:
                     out = torch.max(out, res_out)
+
+        if self.stride_first:
+            lens = lens // self.stride_first_val
 
         if self.upsample_last:
             lens = 2 * lens
