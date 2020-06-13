@@ -297,7 +297,7 @@ class JasperBlock(nn.Module):
         if stride_first and stride_last:
             raise ValueError("Can only have either `stride_first` or `stride_last` !")
 
-        if stride_first:
+        if stride_first and stride[0] > 1:
             conv.append(nn.AvgPool1d(2))
 
         for _ in range(repeat - 1):

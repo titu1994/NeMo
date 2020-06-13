@@ -59,7 +59,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
-            stride_last: true
+            stride_first: true
             residual_mode: "stride_add"
 
         -   filters: 192
@@ -127,12 +127,12 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
-            stride_last: true
+            stride_first: true
             residual_mode: "stride_add"
 
         -   filters: 192
             repeat: *repeat
-            kernel: [27]
+            kernel: [15]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -143,7 +143,7 @@ ContextNetEncoder:
 
         -   filters: 192
             repeat: *repeat
-            kernel: [29]
+            kernel: [17]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -154,7 +154,7 @@ ContextNetEncoder:
 
         -   filters: 192
             repeat: *repeat
-            kernel: [31]
+            kernel: [19]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -165,7 +165,64 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [33]
+            kernel: [21]
+            stride: [1]
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [23]
+            stride: [1]
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [25]
+            stride: [1]
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [27]
+            stride: [1]  # [1] for 4x stride, replace with *stride or [2] for 8x stride
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+            stride_first: true
+            residual_mode: "stride_add"
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [29]
+            stride: [1]
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [31]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -187,31 +244,7 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [37]
-            stride: [1]
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-
-        -   filters: 384
-            repeat: *repeat
             kernel: [39]
-            stride: [1]  # [1] for 4x stride, replace with *stride or [2] for 8x stride
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-            stride_last: true
-            residual_mode: "stride_add"
-
-        -   filters: 384
-            repeat: *repeat
-            kernel: [41]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -233,17 +266,6 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [45]
-            stride: [1]
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-
-        -   filters: 384
-            repeat: *repeat
             kernel: [47]
             stride: [1]
             dilation: [1]
@@ -255,29 +277,7 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [49]
-            stride: [1]
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-
-        -   filters: 384
-            repeat: *repeat
             kernel: [51]
-            stride: [1]
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-
-        -   filters: 384
-            repeat: *repeat
-            kernel: [53]
             stride: [1]
             dilation: [1]
             dropout: *dropout
