@@ -269,6 +269,7 @@ class JasperBlock(nn.Module):
         se_reduction_ratio=16,
         se_context_window=None,
         se_interpolation_mode='nearest',
+        stride_first=False,
         stride_last=False,
         upsample_last=False,
     ):
@@ -292,6 +293,12 @@ class JasperBlock(nn.Module):
 
         inplanes_loop = inplanes
         conv = nn.ModuleList()
+
+        if stride_first and stride_last:
+            raise ValueError("Can only have either `stride_first` or `stride_last` !")
+
+        if stride_first:
+            conv.append(nn.AvgPool1d(2))
 
         for _ in range(repeat - 1):
             # Stride last means only the last convolution in block will have stride
