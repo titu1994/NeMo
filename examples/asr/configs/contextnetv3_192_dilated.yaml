@@ -222,7 +222,7 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [47]
+            kernel: [49]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -233,7 +233,18 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [49]
+            kernel: [53]
+            stride: [1]
+            dilation: [1]
+            dropout: *dropout
+            residual: true
+            separable: true
+            se: true
+            se_context_size: -1
+
+        -   filters: 384
+            repeat: *repeat
+            kernel: [57]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -255,7 +266,7 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [69]
+            kernel: [65]
             stride: [1]
             dilation: [1]
             dropout: *dropout
@@ -266,20 +277,9 @@ ContextNetEncoder:
 
         -   filters: 384
             repeat: *repeat
-            kernel: [75]
+            kernel: [41]
             stride: [1]
-            dilation: [1]
-            dropout: *dropout
-            residual: true
-            separable: true
-            se: true
-            se_context_size: -1
-
-        -   filters: 384
-            repeat: *repeat
-            kernel: [81]
-            stride: [1]
-            dilation: [1]
+            dilation: [2]
             dropout: *dropout
             residual: true
             separable: true
