@@ -842,6 +842,7 @@ class TarredAudioToTextBPEDataLayer(DataLayerNM):
         min_duration=0.1,
         max_duration=None,
         trim_silence=False,
+        pad_id=None,
         shuffle_n=0,
         num_workers=0,
         augmentor: Optional[Union['AudioAugmentor', Dict[str, Dict[str, Any]]]] = None,
@@ -882,14 +883,9 @@ class TarredAudioToTextBPEDataLayer(DataLayerNM):
         else:
             eos_id = None
 
-        if hasattr(tokenizer, 'pad_token'):
-            pad_id = tokenizer.pad_id
-        else:
-            pad_id = 0
-
         self.bos_id = bos_id
         self.eos_id = eos_id
-        self.pad_id = pad_id
+        self.pad_id = 0 if pad_id is None else pad_id
 
         # Used in creating a sampler (in Actions).
         self._batch_size = batch_size
