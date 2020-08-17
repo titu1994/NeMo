@@ -885,7 +885,7 @@ class TarredAudioToTextBPEDataLayer(DataLayerNM):
 
         self.bos_id = bos_id
         self.eos_id = eos_id
-        self.pad_id = 0 if pad_id is None else pad_id
+        pad_id = 0 if pad_id is None else pad_id
 
         # Used in creating a sampler (in Actions).
         self._batch_size = batch_size
