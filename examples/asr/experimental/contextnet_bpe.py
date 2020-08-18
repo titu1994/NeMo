@@ -84,6 +84,10 @@ def parse_args():
     parser.add_argument("--update_freq", default=50, type=int, help="Metrics update freq")
     parser.add_argument("--eval_freq", default=1000, type=int, help="Evaluation frequency")
     parser.add_argument('--kernel_size_factor', default=1.0, type=float)
+
+    parser.add_argument("--spec_time_width", default=0.05, type=float, help='Time mask width')
+    parser.add_argument("--spec_time_masks", default=2, type=int, help='Time masks')
+
     parser.add_argument('--pretrained_encoder', default=None, type=str)
     parser.add_argument('--pretrained_decoder', default=None, type=str)
     parser.add_argument('--freeze_encoder', action="store_true", required=False)
@@ -254,6 +258,9 @@ def create_all_dags(args, neural_factory):
 
     spectr_augment_config = contextnet_params.get('SpectrogramAugmentation', None)
     if spectr_augment_config:
+        spectr_augment_config['time_masks'] = args.spec_time_masks
+        spectr_augment_config['time_width'] = args.spec_time_width
+
         data_spectr_augmentation = nemo_asr.SpectrogramAugmentation(**spectr_augment_config)
 
     # assemble train DAG
