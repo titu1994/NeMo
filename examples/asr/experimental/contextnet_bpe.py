@@ -48,6 +48,7 @@ def parse_args():
         weight_decay=0.001,
         amp_opt_level="O0",
         create_tb_writer=True,
+        grad_norm=False
     )
 
     # Overwrite default args
@@ -96,6 +97,8 @@ def parse_args():
     parser.add_argument('--max_test_duration', default=None, type=float, help='Maximum duration for test set.'
                                                                               'Filters out files !'
                                                                               'Do not use during final evaluation !')
+
+    parser.add_argument('--grad_norm', action='store_true', required=False)
 
     parser.set_defaults(freeze_encoder=False, freeze_decoder=False)
 
@@ -436,6 +439,7 @@ def main():
             "weight_decay": args.weight_decay,
             "grad_norm_clip": None,
             "amp_min_loss_scale": 1e-4,
+            "grad_norm": args.grad_norm
         },
         batches_per_step=args.iter_per_step,
         synced_batchnorm=args.synced_bn,

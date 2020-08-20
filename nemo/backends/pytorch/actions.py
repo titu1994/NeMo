@@ -266,6 +266,7 @@ class PtActions(Actions):
                     luc=optimization_params.get("luc", False),
                     luc_trust=optimization_params.get("luc_eta", 1e-3),
                     betas=optimization_params.get("betas", (0.95, 0.25)),
+                    grad_norm=optimization_params.get('grad_norm', False),
                 )
             elif optimizer_class.lower() == "fused_novograd":
                 if not FusedNovoGrad:
