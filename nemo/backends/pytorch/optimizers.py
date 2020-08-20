@@ -150,10 +150,12 @@ class Novograd(Optimizer):
         luc=False,
         luc_trust=1e-3,
         luc_eps=1e-8,
+        grad_norm=False
     ):
         _check_valid_opt_params(lr, eps, betas)
         defaults = dict(
             lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, grad_averaging=grad_averaging, amsgrad=amsgrad,
+            grad_norm=grad_norm
         )
         self.luc = luc
         self.luc_trust = luc_trust
@@ -225,6 +227,11 @@ class Novograd(Optimizer):
                 if group["grad_averaging"]:
                     grad.mul_(1 - beta1)
                 exp_avg.mul_(beta1).add_(grad)
+
+                # Normalize exp moving average
+                if group["grad_norm"]:
+                    norm = exp_avg.norm()
+                    exp_avg.div_(norm)
 
                 if self.luc:
                     # Clip update so that updates are less than eta*weights
