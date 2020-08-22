@@ -186,6 +186,7 @@ class SqueezeExcite(nn.Module):
         context_window: int = -1,
         interpolation_mode: str = 'nearest',
         activation: Optional[Callable] = None,
+        use_std=False
     ):
         """
         Squeeze-and-Excitation sub-module.
@@ -206,6 +207,7 @@ class SqueezeExcite(nn.Module):
         super(SqueezeExcite, self).__init__()
         self.context_window = int(context_window)
         self.interpolation_mode = interpolation_mode
+        self.use_std = use_std
 
         if self.context_window <= 0:
             self.pool = nn.AdaptiveAvgPool1d(1)  # context window = T
@@ -215,8 +217,9 @@ class SqueezeExcite(nn.Module):
         if activation is None:
             activation = nn.ReLU(inplace=True)
 
+        input_channels = 2 * channels if use_std else channels
         self.fc = nn.Sequential(
-            nn.Linear(channels, channels // reduction_ratio, bias=False),
+            nn.Linear(input_channels, channels // reduction_ratio, bias=False),
             activation,
             nn.Linear(channels // reduction_ratio, channels, bias=False),
         )
@@ -224,6 +227,11 @@ class SqueezeExcite(nn.Module):
     def forward(self, x):
         batch, channels, timesteps = x.size()
         y = self.pool(x)  # [B, C, T - context_window + 1]
+
+        if self.use_std:
+            y_std = x.std(dim=-1, keepdim=True)  # [B, C, 1]
+            y = torch.cat([y, y_std], dim=1)  # [B, 2 * C, 1]
+
         y = y.transpose(1, 2)  # [B, T - context_window + 1, C]
         y = self.fc(y)  # [B, T - context_window + 1, C]
         y = y.transpose(1, 2)  # [B, C, T - context_window + 1]
@@ -269,6 +277,7 @@ class JasperBlock(nn.Module):
         se_reduction_ratio=16,
         se_context_window=None,
         se_interpolation_mode='nearest',
+        se_use_std=False,
         stride_last=False,
     ):
         super(JasperBlock, self).__init__()
@@ -342,6 +351,7 @@ class JasperBlock(nn.Module):
                     context_window=se_context_window,
                     interpolation_mode=se_interpolation_mode,
                     activation=activation,
+                    use_std=se_use_std
                 )
             )
 

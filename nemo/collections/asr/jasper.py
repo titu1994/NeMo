@@ -187,6 +187,7 @@ class JasperEncoder(TrainableNM):
             se_reduction_ratio = lcfg.get('se_reduction_ratio', 8)
             se_context_window = lcfg.get('se_context_window', -1)
             se_interpolation_mode = lcfg.get('se_interpolation_mode', 'nearest')
+            se_use_std = lcfg.get('se_use_std', False)
             kernel_size_factor = lcfg.get('kernel_size_factor', 1.0)
             stride_last = lcfg.get('stride_last', False)
             encoder_layers.append(
@@ -212,6 +213,7 @@ class JasperEncoder(TrainableNM):
                     se_reduction_ratio=se_reduction_ratio,
                     se_context_window=se_context_window,
                     se_interpolation_mode=se_interpolation_mode,
+                    se_use_std=se_use_std,
                     kernel_size_factor=kernel_size_factor,
                     stride_last=stride_last,
                 )
