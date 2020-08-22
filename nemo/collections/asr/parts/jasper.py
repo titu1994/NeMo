@@ -232,6 +232,8 @@ class SqueezeExcite(nn.Module):
             y_std = x.std(dim=-1, keepdim=True)  # [B, C, 1]
             y = torch.cat([y, y_std], dim=1)  # [B, 2 * C, 1]
 
+            del y_std
+
         y = y.transpose(1, 2)  # [B, T - context_window + 1, C]
         y = self.fc(y)  # [B, T - context_window + 1, C]
         y = y.transpose(1, 2)  # [B, C, T - context_window + 1]
