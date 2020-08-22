@@ -48,6 +48,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -60,9 +61,10 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
+            se_use_std: *se_use_std
             stride_last: true
             residual_mode: "stride_add"
-            se_use_std: *se_use_std
 
         -   filters: 192
             repeat: *repeat
@@ -74,6 +76,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -86,6 +89,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -98,6 +102,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -110,6 +115,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -122,6 +128,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -136,6 +143,7 @@ ContextNetEncoder:
             se_context_size: -1
             stride_last: true
             residual_mode: "stride_add"
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -148,6 +156,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -160,6 +169,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 192
@@ -172,6 +182,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -184,6 +195,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -196,6 +208,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -208,6 +221,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -222,6 +236,7 @@ ContextNetEncoder:
             se_context_size: -1
             stride_last: true
             residual_mode: "stride_add"
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -233,6 +248,7 @@ ContextNetEncoder:
             residual: true
             separable: true
             se: true
+            se_reduction_ratio: 16
             se_context_size: -1
             se_use_std: *se_use_std
 
@@ -245,6 +261,7 @@ ContextNetEncoder:
             residual: true
             separable: true
             se: true
+            se_reduction_ratio: 16
             se_context_size: -1
             se_use_std: *se_use_std
 
@@ -258,6 +275,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -270,6 +288,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -282,6 +301,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -294,6 +314,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 384
@@ -306,6 +327,7 @@ ContextNetEncoder:
             separable: true
             se: true
             se_context_size: -1
+            se_reduction_ratio: 16
             se_use_std: *se_use_std
 
         -   filters: 480
