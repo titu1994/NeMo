@@ -224,12 +224,16 @@ class SqueezeExcite(nn.Module):
             nn.Linear(channels // reduction_ratio, channels, bias=False),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         batch, channels, timesteps = x.size()
         y = self.pool(x)  # [B, C, T - context_window + 1]
 
         if self.use_std:
-            y_std = x.std(dim=-1, keepdim=True)  # [B, C, 1]
+            x_clipped = x.clamp(-200., 200.)
+            y_std = x_clipped.std(dim=-1, keepdim=True)  # [B, C, 1]
+
+            del x_clipped
+
             y = torch.cat([y, y_std], dim=1)  # [B, 2 * C, 1]
 
             del y_std
