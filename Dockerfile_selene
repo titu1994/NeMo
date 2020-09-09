@@ -35,39 +35,39 @@ ENV PATH=$PATH:/usr/src/tensorrt/bin
 WORKDIR /tmp/trt-oss
 ARG NV_REPO=https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64
 
-RUN cd /tmp/trt-oss
-ARG DEB=libcudnn7_7.6.5.32-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvinfer7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvinfer-plugin7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvonnxparsers7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=python-libnvinfer_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-RUN dpkg -i *.deb && cd ../.. && rm -rf /tmp/trt-oss
+# RUN cd /tmp/trt-oss
+# ARG DEB=libcudnn7_7.6.5.32-1+cuda10.2_amd64.deb
+# RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
+# ARG DEB=libnvinfer7_7.0.0-1+cuda10.2_amd64.deb
+# RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
+# ARG DEB=libnvinfer-plugin7_7.0.0-1+cuda10.2_amd64.deb
+# RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
+# ARG DEB=libnvonnxparsers7_7.0.0-1+cuda10.2_amd64.deb
+# RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
+# ARG DEB=python-libnvinfer_7.0.0-1+cuda10.2_amd64.deb
+# RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
+# RUN dpkg -i *.deb && cd ../.. && rm -rf /tmp/trt-oss
 
 # install warp-ctc
-RUN COMMIT_SHA=f546575109111c455354861a0567c8aa794208a2 && \
-    git clone https://github.com/HawkAaron/warp-transducer deps/warp-transducer && \
-    cd deps/warp-transducer && \
-    git checkout $COMMIT_SHA && \
-    mkdir build && \
-    cd build && \
-    cmake .. && \
-    make VERBOSE=1 && \
-	export CUDA_HOME="/usr/local/cuda" && \
-    export WARP_RNNT_PATH=`pwd` && \
-    export CUDA_TOOLKIT_ROOT_DIR=$CUDA_HOME && \
-    export LD_LIBRARY_PATH="$CUDA_HOME/extras/CUPTI/lib64:$LD_LIBRARY_PATH" && \
-    export LIBRARY_PATH=$CUDA_HOME/lib64:$LIBRARY_PATH && \
-    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH && \
-    export CFLAGS="-I$CUDA_HOME/include $CFLAGS" && \
-    cd ../pytorch_binding && \
-    python3 setup.py install && \
-    rm -rf ../tests test ../tensorflow_binding && \
-    cd ../../..
+# RUN COMMIT_SHA=f546575109111c455354861a0567c8aa794208a2 && \
+#    git clone https://github.com/HawkAaron/warp-transducer deps/warp-transducer && \
+#    cd deps/warp-transducer && \
+#    git checkout $COMMIT_SHA && \
+#    mkdir build && \
+#    cd build && \
+#    cmake .. && \
+#    make VERBOSE=1 && \
+#	 export CUDA_HOME="/usr/local/cuda" && \
+#    export WARP_RNNT_PATH=`pwd` && \
+#    export CUDA_TOOLKIT_ROOT_DIR=$CUDA_HOME && \
+#    export LD_LIBRARY_PATH="$CUDA_HOME/extras/CUPTI/lib64:$LD_LIBRARY_PATH" && \
+#    export LIBRARY_PATH=$CUDA_HOME/lib64:$LIBRARY_PATH && \
+#    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH && \
+#    export CFLAGS="-I$CUDA_HOME/include $CFLAGS" && \
+#    cd ../pytorch_binding && \
+#    python3 setup.py install && \
+#    rm -rf ../tests test ../tensorflow_binding && \
+#    cd ../../..
 
 # install nemo dependencies
 WORKDIR /tmp/nemo
