@@ -37,7 +37,7 @@ ContextNetEncoder:
     conv_mask: true
 
     jasper:
-        -   filters: 192
+        -   filters: 256
             repeat: 1
             kernel: [5]
             stride: [1]
@@ -45,10 +45,10 @@ ContextNetEncoder:
             dropout: 0.0
             residual: false
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [11]
             stride: [2]
@@ -56,12 +56,12 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
             stride_last: true
             residual_mode: "stride_add"
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [13]
             stride: [1]
@@ -69,10 +69,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [15]
             stride: [1]
@@ -80,10 +80,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [17]
             stride: [1]
@@ -91,10 +91,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [19]
             stride: [1]
@@ -102,10 +102,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [21]
             stride: [1]
@@ -113,10 +113,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [13]
             stride: [2]  # *stride
@@ -124,12 +124,12 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
             stride_last: true
             residual_mode: "stride_add"
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [15]
             stride: [1]
@@ -137,10 +137,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [17]
             stride: [1]
@@ -148,10 +148,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 192
+        -   filters: 256
             repeat: *repeat
             kernel: [19]
             stride: [1]
@@ -159,10 +159,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [21]
             stride: [1]
@@ -170,10 +170,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [23]
             stride: [1]
@@ -181,10 +181,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [25]
             stride: [1]
@@ -192,10 +192,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [25]
             stride: [2]  # stride
@@ -203,12 +203,12 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
             stride_last: true
             residual_mode: "stride_add"
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [27]
             stride: [1]
@@ -216,10 +216,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [29]
             stride: [1]
@@ -227,10 +227,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [31]
             stride: [1]
@@ -238,10 +238,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [33]
             stride: [1]
@@ -249,10 +249,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [35]
             stride: [1]
@@ -260,10 +260,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [37]
             stride: [1]
@@ -271,10 +271,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 384
+        -   filters: 512
             repeat: *repeat
             kernel: [39]
             stride: [1]
@@ -282,10 +282,10 @@ ContextNetEncoder:
             dropout: *dropout
             residual: true
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
-        -   filters: 480
+        -   filters: 640
             repeat: 1
             kernel: [41]
             stride: [1]
@@ -293,7 +293,7 @@ ContextNetEncoder:
             dropout: 0.0
             residual: false
             separable: true
-            se: false
+            se: true
             se_context_size: -1
 
 labels: [" ", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
