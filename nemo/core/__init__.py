@@ -1,7 +1,4 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+<<<<<<< HEAD
 from nemo.core.callbacks import *
 from nemo.core.module_decorators import *
 from nemo.core.nemo_model import NeMoModel
@@ -22,3 +20,7 @@ from nemo.core.neural_factory import *
 from nemo.core.neural_graph import *
 from nemo.core.neural_modules import *
 from nemo.core.neural_types import *
+=======
+import nemo.core.neural_types
+from nemo.core.classes import *
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6

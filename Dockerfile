@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:20.01-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:20.09-py3
+
 
 # build an image that includes only the nemo dependencies, ensures that dependencies
 # are included first for optimal caching, and useful for building a development
@@ -30,28 +31,17 @@ RUN apt-get update && \
     python-dev ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-# install trt
-ENV PATH=$PATH:/usr/src/tensorrt/bin
-WORKDIR /tmp/trt-oss
-ARG NV_REPO=https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64
-
-RUN cd /tmp/trt-oss
-ARG DEB=libcudnn7_7.6.5.32-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvinfer7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvinfer-plugin7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=libnvonnxparsers7_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-ARG DEB=python-libnvinfer_7.0.0-1+cuda10.2_amd64.deb
-RUN curl -sL --output ${DEB} ${NV_REPO}/${DEB}
-RUN dpkg -i *.deb && cd ../.. && rm -rf /tmp/trt-oss
+# build torchaudio (change latest release version to match pytorch)
+WORKDIR /tmp/torchaudio_build
+RUN git clone --depth 1 --branch release/0.6 https://github.com/pytorch/audio.git && \
+    cd audio && \
+    BUILD_SOX=1 python setup.py install && \
+    cd .. && rm -r audio
 
 # install nemo dependencies
 WORKDIR /tmp/nemo
-COPY requirements/requirements_docker.txt requirements.txt
-RUN pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+COPY requirements .
+RUN for f in $(ls requirements/*.txt); do pip install --disable-pip-version-check --no-cache-dir -r $f; done
 
 # copy nemo source into a scratch image
 FROM scratch as nemo-src
@@ -59,8 +49,7 @@ COPY . .
 
 # start building the final container
 FROM nemo-deps as nemo
-ARG NEMO_VERSION
-ARG BASE_IMAGE
+ARG NEMO_VERSION=1.0.0b1
 
 # Check that NEMO_VERSION is set. Build will fail without this. Expose NEMO and base container
 # version information as runtime environment variable for introspection purposes
@@ -74,7 +63,8 @@ WORKDIR /workspace/nemo
 COPY scripts /workspace/nemo/scripts
 COPY examples /workspace/nemo/examples
 COPY tests /workspace/nemo/tests
-COPY README.rst LICENSE /workspace/nemo/
+COPY tutorials /workspace/nemo/tutorials
+# COPY README.rst LICENSE /workspace/nemo/
 
 RUN printf "#!/bin/bash\njupyter lab --no-browser --allow-root --ip=0.0.0.0" >> start-jupyter.sh && \
     chmod +x start-jupyter.sh

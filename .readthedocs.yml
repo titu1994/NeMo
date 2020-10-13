@@ -22,7 +22,7 @@ version: 2
 
 # Build documentation in the docs/ directory with Sphinx.
 sphinx:
-  configuration: docs/sources/source/conf.py
+  configuration: docs/source/conf.py
 
 # Set the version of Python and requirements required to build your docs
 python:

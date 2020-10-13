@@ -1,4 +1,17 @@
-# Copyright (c) 2019 NVIDIA Corporation
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import json
 import os
@@ -78,7 +91,7 @@ class AudioText(_Collection):
     """List of audio-transcript text correspondence with preprocessing."""
 
     OUTPUT_TYPE = collections.namedtuple(
-        typename='AudioTextEntity', field_names='id audio_file duration text_tokens offset text_raw speaker',
+        typename='AudioTextEntity', field_names='id audio_file duration text_tokens offset text_raw speaker orig_sr',
     )
 
     def __init__(
@@ -89,6 +102,7 @@ class AudioText(_Collection):
         texts: List[str],
         offsets: List[str],
         speakers: List[Optional[int]],
+        orig_sampling_rates: List[Optional[int]],
         parser: parsers.CharParser,
         min_duration: Optional[float] = None,
         max_duration: Optional[float] = None,
@@ -105,6 +119,7 @@ class AudioText(_Collection):
             texts: List of raw text transcripts.
             offsets: List of duration offsets or None.
             speakers: List of optional speakers ids.
+            orig_sampling_rates: List of original sampling rates of audio files.
             parser: Instance of `CharParser` to convert string to tokens.
             min_duration: Minimum duration to keep entry with (default: None).
             max_duration: Maximum duration to keep entry with (default: None).
@@ -118,8 +133,8 @@ class AudioText(_Collection):
         if index_by_file_id:
             self.mapping = {}
 
-        for id_, audio_file, duration, offset, text, speaker in zip(
-            ids, audio_files, durations, offsets, texts, speakers,
+        for id_, audio_file, duration, offset, text, speaker, orig_sr in zip(
+            ids, audio_files, durations, offsets, texts, speakers, orig_sampling_rates
         ):
             # Duration filters.
             if min_duration is not None and duration < min_duration:
@@ -140,7 +155,7 @@ class AudioText(_Collection):
 
             total_duration += duration
 
-            data.append(output_type(id_, audio_file, duration, text_tokens, offset, text, speaker))
+            data.append(output_type(id_, audio_file, duration, text_tokens, offset, text, speaker, orig_sr))
             if index_by_file_id:
                 file_id, _ = os.path.splitext(os.path.basename(audio_file))
                 self.mapping[file_id] = len(data) - 1
@@ -174,7 +189,7 @@ class ASRAudioText(AudioText):
             **kwargs: Kwargs to pass to `AudioText` constructor.
         """
 
-        ids, audio_files, durations, texts, offsets, speakers = [], [], [], [], [], []
+        ids, audio_files, durations, texts, offsets, speakers, orig_srs = [], [], [], [], [], [], []
         for item in manifest.item_iter(manifests_files):
             ids.append(item['id'])
             audio_files.append(item['audio_file'])
@@ -182,8 +197,9 @@ class ASRAudioText(AudioText):
             texts.append(item['text'])
             offsets.append(item['offset'])
             speakers.append(item['speaker'])
+            orig_srs.append(item['orig_sr'])
 
-        super().__init__(ids, audio_files, durations, texts, offsets, speakers, *args, **kwargs)
+        super().__init__(ids, audio_files, durations, texts, offsets, speakers, orig_srs, *args, **kwargs)
 
 
 class SpeechLabel(_Collection):

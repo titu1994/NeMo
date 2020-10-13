@@ -1,7 +1,4 @@
-# =============================================================================
-# Copyright 2020 NVIDIA. All Rights Reserved.
-# Copyright 2018 The Google AI Language Team Authors and
-# The HuggingFace Inc. team.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,82 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# =============================================================================
-
-"""
-Some transformer of this code were adapted from the HuggingFace library at
-https://github.com/huggingface/transformers
-
-Download the SQuAD data by running the script:
-examples/nlp/question_answering/get_squad.py
-
-To finetune SQuADv1.1 on pretrained BERT Base uncased on 1 GPU:
-python question_answering_squad.py
---train_file /path_to_data_dir/squad/v1.1/train-v1.1.json
---eval_file /path_to_data_dir/squad/v1.1/dev-v1.1.json
---work_dir /path_to_output_folder
---bert_config /path_to/bert-config.json
---pretrained_model_name bert-base-uncased
---bert_checkpoint /path_to_bert_checkpoint
---amp_opt_level "O2"
---batch_size 24
---num_epochs 2
---lr_policy WarmupAnnealing
---optimizer fused_adam
---lr 3e-5
---do_lower_case
---mode train_eval
---no_data_cache
-
-If --bert_checkpoint and --bert_config are not specified, training starts from
-Huggingface pretrained checkpoints.
-
-To finetune SQuADv1.1 on pretrained BERT large uncased on 8 GPU change to:
-python -m torch.distributed.launch --nproc_per_node=8 question_answering_squad.py
---batch_size 3
---num_gpus 8
-...
-
-This takes about 18 minutes.
-
-To finetune on SQuADv2.0 which allows non-answerable questions, add the flag --version_2_with_negative.
-
-To run only evaluation on pretrained question answering checkpoints on 1 GPU with ground-truth data:
-python question_answering_squad.py
---eval_file /path_to_data_dir/test.json
---checkpoint_dir /path_to_checkpoints
---mode eval
-
-To run only inference on pretrained question answering checkpoints on 1 GPU without ground-truth data:
-python question_answering_squad.py
---test_file /path_to_data_dir/test.json
---checkpoint_dir /path_to_checkpoints
---mode test
-
-Finetuned SQuAD models and model configuration files can be found at 
-https://ngc.nvidia.com/catalog/models/nvidia:bertlargeuncasedsquadv1
-https://ngc.nvidia.com/catalog/models/nvidia:bertlargeuncasedsquadv2
-https://ngc.nvidia.com/catalog/models/nvidia:bertbaseuncasedsquadv1
-https://ngc.nvidia.com/catalog/models/nvidia:bertbaseuncasedsquadv2
 
 
-On BERT base uncased pretrained model
-the final Exact Match (EM) and F1 scores are as follows:
-Data	        EM      F1
-SQuADv1.1       82.74   89.79
-SQuADv2.0       71.24   74.32
-
-
-On BERT large uncased pretrained model
-the final Exact Match (EM) and F1 scores are as follows:
-Data	        EM      F1
-SQuADv1.1       85.79   92.28
-SQuADv2.0       80.17   83.32
-"""
-import argparse
-import json
 import os
 
+<<<<<<< HEAD
 import numpy as np
 
 import nemo.collections.nlp as nemo_nlp
@@ -455,71 +381,41 @@ if __name__ == "__main__":
         else:
             total_steps = args.max_steps
             optimization_params['max_steps'] = args.max_steps
+=======
+import pytorch_lightning as pl
+from omegaconf import DictConfig
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 
-        lr_policy_fn = get_lr_policy(args.lr_policy, total_steps=total_steps, warmup_ratio=args.lr_warmup_proportion)
+from nemo.collections.nlp.models.question_answering.qa_model import QAModel
+from nemo.core.config import hydra_runner
+from nemo.utils import logging
+from nemo.utils.exp_manager import exp_manager
 
-        if args.grad_norm_clip >= 0:
-            optimization_params['grad_norm_clip'] = args.grad_norm_clip
 
-        nf.train(
-            tensors_to_optimize=[train_loss],
-            callbacks=callbacks,
-            lr_policy=lr_policy_fn,
-            optimizer=args.optimizer,
-            batches_per_step=args.batches_per_step,
-            optimization_params=optimization_params,
-        )
+@hydra_runner(config_path="conf", config_name="question_answering_squad_config")
+def main(cfg: DictConfig) -> None:
+    logging.info(f'Config: {cfg.pretty()}')
+    trainer = pl.Trainer(**cfg.trainer)
+    log_dir = exp_manager(trainer, cfg.get("exp_manager", None))
+    infer_datasets = [cfg.model.validation_ds, cfg.model.test_ds]
+    for infer_dataset in infer_datasets:
+        if infer_dataset.output_prediction_file is not None:
+            infer_dataset.output_prediction_file = os.path.join(log_dir, infer_dataset.output_prediction_file)
+        if infer_dataset.output_nbest_file is not None:
+            infer_dataset.output_nbest_file = os.path.join(log_dir, infer_dataset.output_nbest_file)
 
-    else:
-        load_from_folder = None
-        if args.checkpoint_dir is not None:
-            load_from_folder = args.checkpoint_dir
+    question_answering_model = QAModel(cfg.model, trainer=trainer)
+    trainer.fit(question_answering_model)
 
-        evaluated_tensors = nf.infer(
-            tensors=eval_output, checkpoint_dir=load_from_folder, cache=True, offload_to_cpu=False
-        )
-        unique_ids = []
-        for t in evaluated_tensors[0]:
-            unique_ids.extend(t.tolist())
-        if "eval" in args.mode:
-            start_logits = []
-            end_logits = []
-            for t in evaluated_tensors[1]:
-                start_logits.extend(t.tolist())
-            for t in evaluated_tensors[2]:
-                end_logits.extend(t.tolist())
+    if hasattr(cfg.model, 'test_ds') and cfg.model.test_ds.file is not None:
+        gpu = 1 if cfg.trainer.gpus != 0 else 0
+        trainer = pl.Trainer(gpus=gpu)
+        if question_answering_model.prepare_test(trainer):
+            trainer.test(question_answering_model)
 
-            exact_match, f1, all_predictions, all_nbest = eval_data_layer.dataset.evaluate(
-                unique_ids=unique_ids,
-                start_logits=start_logits,
-                end_logits=end_logits,
-                n_best_size=args.n_best_size,
-                max_answer_length=args.max_answer_length,
-                version_2_with_negative=args.version_2_with_negative,
-                null_score_diff_threshold=args.null_score_diff_threshold,
-                do_lower_case=args.do_lower_case,
-            )
+    if cfg.model.nemo_path:
+        question_answering_model.save_to(cfg.model.nemo_path)
 
-            logging.info(f"exact_match: {exact_match}, f1: {f1}")
 
-        elif "test" in args.mode:
-            logits = []
-            for t in evaluated_tensors[1]:
-                logits.extend(t.tolist())
-            start_logits, end_logits = np.split(np.asarray(logits), 2, axis=-1)
-            (all_predictions, all_nbest, scores_diff) = test_data_layer.dataset.get_predictions(
-                unique_ids=unique_ids,
-                start_logits=start_logits,
-                end_logits=end_logits,
-                n_best_size=args.n_best_size,
-                max_answer_length=args.max_answer_length,
-                version_2_with_negative=args.version_2_with_negative,
-                null_score_diff_threshold=args.null_score_diff_threshold,
-                do_lower_case=args.do_lower_case,
-            )
-        if args.output_nbest_file is not None:
-            with open(args.output_nbest_file, "w") as writer:
-                writer.write(json.dumps(all_nbest, indent=4) + "\n")
-        if args.output_prediction_file is not None:
-            with open(args.output_prediction_file, "w") as writer:
-                writer.write(json.dumps(all_predictions, indent=4) + "\n")
+if __name__ == '__main__':
+    main()

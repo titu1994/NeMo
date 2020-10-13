@@ -1,6 +1,27 @@
-# Copyright (c) 2019 NVIDIA Corporation
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
-# USAGE: python get_ljspeech_data.py --data_root=<where to put data>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Usage:
+
+python process_speech_commands_data.py \
+    --data_root=<absolute path to where the data should be stored> \
+    --data_version=<either 1 or 2, indicating version of the dataset> \
+    --class_split=<either "all" or "sub", indicates whether all 30/35 classes should be used, or the 10+2 split should be used> \
+    --rebalance \
+    --log
+"""
 
 import argparse
 import glob
@@ -55,14 +76,20 @@ def extract_file(filepath: str, data_dir: str):
         logging.info('Not extracting. Maybe already there?')
 
 
-def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
+def __process_data(
+    data_folder: str, dst_folder: str, rebalance: bool = False, class_split: str = "all", skip_duration: bool = False
+):
     """
     To generate manifest
 
     Args:
         data_folder: source with wav files and validation / test lists
         dst_folder: where manifest files will be stored
-        rebalance:
+        rebalance: rebalance the classes to have same number of samples.
+        class_split: whether to use all classes as distinct labels, or to use
+            10 classes subset and rest of the classes as noise or background.
+        skip_duration: Bool whether to skip duration computation. Use this only for
+            colab notebooks where knowing duration is not necessary for demonstration.
 
     Returns:
 
@@ -70,6 +97,9 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
 
     if not os.path.exists(dst_folder):
         os.makedirs(dst_folder)
+
+    # Used for 10 classes + silence + unknown class setup
+    class_subset = ["yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"]
 
     pattern = re.compile(r"(.+\/)?(\w+)\/([^_]+)_.+wav")
     all_files = glob.glob(os.path.join(data_folder, '*/*wav'))
@@ -92,16 +122,30 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
         if r:
             testset.add(r.group(3))
 
+    logging.info("Validation and test set lists extracted")
+
     label_count = {}
     label_filepaths = {}
+    unknown_val_filepaths = []
+    unknown_test_filepaths = []
 
     train, val, test = [], [], []
     for entry in all_files:
         r = re.match(pattern, entry)
         if r:
             label, uid = r.group(2), r.group(3)
-            if label == '_background_noise_':
+
+            if label == '_background_noise_' or label == 'silence':
                 continue
+
+            if class_split == "sub":
+                if label not in class_subset:
+                    label = "unknown"  # replace label
+
+                    if uid in valset:
+                        unknown_val_filepaths.append((label, entry))
+                    elif uid in testset:
+                        unknown_test_filepaths.append((label, entry))
 
             sample = (label, entry)
 
@@ -116,6 +160,9 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
                 else:
                     label_filepaths[label] = [sample]
 
+            if label == 'unknown':
+                continue
+
             if uid in valset:
                 val.append(sample)
             elif uid in testset:
@@ -123,9 +170,115 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
             else:
                 train.append(sample)
 
+    logging.info("Prepared filepaths for dataset")
+
+    # Add silence and unknown class label samples
+    if class_split == "sub":
+        logging.info("Perforiming 10+2 class subsplit")
+
+        silence_path = os.path.join(data_folder, "silence")
+        if not os.path.exists(silence_path):
+            os.mkdir(silence_path)
+
+        silence_stride = 1000  # 0.0625 second stride
+        sampling_rate = 16000
+        folder = os.path.join(data_folder, "_background_noise_")
+
+        silence_files = []
+        rng = np.random.RandomState(0)
+
+        for file in os.listdir(folder):
+            if ".wav" in file:
+                load_path = os.path.join(folder, file)
+                y, sr = librosa.load(load_path, sr=sampling_rate)
+
+                for i in range(0, len(y) - sampling_rate, silence_stride):
+                    file_path = "silence/{}_{}.wav".format(file[:-4], i)
+                    y_slice = y[i : i + sampling_rate]
+                    magnitude = rng.uniform(0.0, 1.0)
+                    y_slice *= magnitude
+                    out_file_path = os.path.join(data_folder, file_path)
+                    librosa.output.write_wav(out_file_path, y_slice, sr)
+
+                    silence_files.append(('silence', out_file_path))
+
+        rng = np.random.RandomState(0)
+        rng.shuffle(silence_files)
+        logging.info(f"Constructed silence set of {len(silence_files)}")
+
+        # Create the splits
+        rng = np.random.RandomState(0)
+        silence_split = 0.1
+        unknown_split = 0.1
+
+        # train split
+        num_total_samples = sum([label_count[cls] for cls in class_subset])
+        num_silence_samples = int(np.ceil(silence_split * num_total_samples))
+
+        # initialize sample
+        label_count['silence'] = 0
+
+        for silence_id in range(num_silence_samples):
+            label_count['silence'] += 1
+
+            if 'silence' in label_filepaths:
+                label_filepaths['silence'] += [silence_files[silence_id]]
+            else:
+                label_filepaths['silence'] = [silence_files[silence_id]]
+
+        train.extend(label_filepaths['silence'])
+
+        # Update train unknown set
+        unknown_train_samples = label_filepaths['unknown']
+
+        rng.shuffle(unknown_train_samples)
+        unknown_size = int(np.ceil(unknown_split * num_total_samples))
+
+        label_count['unknown'] = unknown_size
+        label_filepaths['unknown'] = unknown_train_samples[:unknown_size]
+
+        train.extend(label_filepaths['unknown'])
+
+        logging.info("Train set prepared")
+
+        # val set silence
+        num_val_samples = len(val)
+        num_silence_samples = int(np.ceil(silence_split * num_val_samples))
+
+        val_idx = label_count['silence'] + 1
+        for silence_id in range(num_silence_samples):
+            val.append(silence_files[val_idx + silence_id])
+
+        # Update val unknown set
+        rng.shuffle(unknown_val_filepaths)
+        unknown_size = int(np.ceil(unknown_split * num_val_samples))
+
+        val.extend(unknown_val_filepaths[:unknown_size])
+
+        logging.info("Validation set prepared")
+
+        # test set silence
+        num_test_samples = len(test)
+        num_silence_samples = int(np.ceil(silence_split * num_test_samples))
+
+        test_idx = val_idx + num_silence_samples + 1
+        for silence_id in range(num_silence_samples):
+            test.append(silence_files[test_idx + silence_id])
+
+        # Update test unknown set
+        rng.shuffle(unknown_test_filepaths)
+        unknown_size = int(np.ceil(unknown_split * num_test_samples))
+
+        test.extend(unknown_test_filepaths[:unknown_size])
+
+        logging.info("Test set prepared")
+
     max_command = None
     max_count = -1
     for command, count in label_count.items():
+        if command == 'unknown':
+            continue
+
         if count > max_count:
             max_count = count
             max_command = command
@@ -164,8 +317,17 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
 
     for manifest_filename, dataset in manifests:
         with open(os.path.join(dst_folder, manifest_filename), 'w') as fout:
+            num_files = len(dataset)
+            pct_file = num_files // 100
+            file_count = 0
+
+            logging.info(f"Preparing manifest : {manifest_filename} with #{num_files} files")
+
             for label, audio_path in dataset:
-                duration = librosa.core.get_duration(filename=audio_path)
+                if not skip_duration:
+                    duration = librosa.core.get_duration(filename=audio_path)
+                else:
+                    duration = 0.0
 
                 # Write the metadata to the manifest
                 metadata = {
@@ -177,16 +339,30 @@ def __process_data(data_folder: str, dst_folder: str, rebalance: bool = False):
                 fout.write('\n')
                 fout.flush()
 
+                file_count += 1
+                if file_count % pct_file == 0:
+                    if not skip_duration:
+                        logging.info(f"Finished serializing {file_count} / {num_files} into {manifest_filename}")
+
         logging.info(f"Finished construction of manifest : {manifest_filename}")
+
+        if skip_duration:
+            logging.info(
+                f"\n<<NOTE>> Duration computation was skipped for demonstration purposes on Colaboratory.\n"
+                f"In order to replicate paper results and properly perform data augmentation, \n"
+                f"please recompute the manifest file without the `--skip_duration` flag !\n"
+            )
 
 
 def main():
     parser = argparse.ArgumentParser(description='Google Speech Command Data download')
     parser.add_argument("--data_root", required=True, default=None, type=str)
     parser.add_argument('--data_version', required=True, default=1, type=int, choices=[1, 2])
+    parser.add_argument('--class_split', required=False, default='all', type=str, choices=['all', 'sub'])
     parser.add_argument('--rebalance', required=False, action='store_true')
+    parser.add_argument('--skip_duration', required=False, action='store_true')
     parser.add_argument('--log', required=False, action='store_true')
-    parser.set_defaults(log=False, rebalance=False)
+    parser.set_defaults(log=False, rebalance=False, skip_duration=False)
     args = parser.parse_args()
 
     if args.log:
@@ -212,7 +388,13 @@ def main():
         __extract_all_files(file_path, data_root, data_folder)
 
     logging.info(f"Processing {data_set}")
-    __process_data(data_folder, data_folder, rebalance=args.rebalance)
+    __process_data(
+        data_folder,
+        data_folder,
+        rebalance=args.rebalance,
+        class_split=args.class_split,
+        skip_duration=args.skip_duration,
+    )
     logging.info('Done!')
 
 

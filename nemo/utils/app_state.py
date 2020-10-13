@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# =============================================================================
-# Copyright (c) 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,114 +11,203 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# =============================================================================
 
-# Sadly have to import the whole "nemo" python module to avoid circular dependencies.
-# Moreover, at that point nemo module doesn't contain "core", so during "python module registration"
-# nothing from nemo.core, including e.g. types (so we cannot use them for "python 3 type hints").
-import nemo
 from nemo.utils.metaclasses import Singleton
-from nemo.utils.neural_graph.neural_graph_manager import NeuralGraphManager
-from nemo.utils.neural_graph.object_registry import ObjectRegistry
-from nemo.utils.nmtensor_registry import NmTensorNameRegistry
 
 
 class AppState(metaclass=Singleton):
-    """
-        Application state stores variables important from the point of view of execution of the NeMo application.
-        Staring from the most elementary (epoch number, episode number, device used etc.) to the currently
-        active graph etc.
-    """
+    def __init__(self):
 
-    def __init__(self, device=None):
-        """
-            Constructor. Initializes global variables.
+        # TODO: should we store global config in hydra_runner?
+        self._app_cfg = None
 
-            Args:
-                device: main device used for computations [CPU | GPU] (DEFAULT: GPU)
-        """
-        # Had to set it to None in argument to avoid circular import at the class initialization phase.
-        if device is None:
-            self._device = nemo.core.DeviceType.GPU
-        else:
-            self._device = device
-        # Create module registry.
-        self._module_registry = ObjectRegistry("module")
-        # Create graph manager (registry with some additional functionality).
-        self._neural_graph_manager = NeuralGraphManager()
-        # Create NmTensor registry
-        self._nmtensor_name_registry = NmTensorNameRegistry()
+        # World info
+        self._device_id = None
+        self._local_rank = None
+        self._global_rank = None
+        self._model_parallel_rank = None
+        self._data_parallel_rank = None
+
+        self._world_size = None
+        self._model_parallel_size = None
+        self._model_parallel_group = None
+        self._data_parallel_size = None
+        self._data_parallel_group = None
+
+        self._random_seed = None
 
     @property
-    def tensor_names(self):
-        """ Property returning the NmTensorNameRegistry which maps user-defined names to tensor's unique_names.
-
+    def device_id(self):
+        """ Property returns the device_id
             Returns:
-                NmTensorNameRegistry.
+                device_id
         """
-        return self._nmtensor_name_registry
+        return self._device_id
+
+    @device_id.setter
+    def device_id(self, id):
+        """ Property sets the device_id.
+            Args:
+                size (int): The device id. 
+        """
+        self._device_id = id
 
     @property
-    def modules(self):
-        """
-            Property returning the existing modules.
-
+    def world_size(self):
+        """ Property returns the total number of GPUs.
             Returns:
-                Existing modules (a set object).
+                Total number of GPUs.
         """
-        return self._module_registry
+        return self._world_size
+
+    @world_size.setter
+    def world_size(self, size):
+        """ Property sets the total number of GPUs.
+            Args:
+                size (int):  Total number of GPUs.
+        """
+        self._world_size = size
 
     @property
-    def graphs(self):
-        """ Property returning the existing graphs.
-
+    def model_parallel_size(self):
+        """ Property returns the number of GPUs in each model parallel group.
             Returns:
-                Existing graphs (a set object).
+                Number of GPUs in each model parallel group.
         """
-        return self._neural_graph_manager
+        return self._model_parallel_size
 
-    def register_module(self, module, name: str) -> str:
-        """
-            Registers a module using the provided name.
-            If name is none - generates a new unique name.
-
+    @model_parallel_size.setter
+    def model_parallel_size(self, size):
+        """ Property sets the number of GPUs in each model parallel group.
             Args:
-                module: A Neural Module object to be registered.
-                name: A "proposition" of module name.
-
-            Returns:
-                A unique name (proposition or newly generated name).
+                size (int):  Number of GPUs in each model parallel group.
         """
-        return self._module_registry.register(module, name)
-
-    def register_graph(self, graph, name: str) -> str:
-        """
-            Registers a new graph using the provided name.
-            If name is none - generates a new unique name.
-
-            Args:
-                graph: A Neural Graph object to be registered.
-                name: A "proposition" of graph name.
-
-            Returns:
-                A unique name (proposition or newly generated name).
-        """
-        return self._neural_graph_manager.register(graph, name)
+        self._model_parallel_size = size
 
     @property
-    def active_graph(self):
-        """ Property returns the active graph.
-
+    def data_parallel_size(self):
+        """ Property returns the number of GPUs in each data parallel group.
             Returns:
-                Active graph.
+                Number of GPUs in each data parallel group.
         """
-        return self._neural_graph_manager.active_graph
+        return self._data_parallel_size
 
-    @active_graph.setter
-    def active_graph(self, graph):
-        """ Property sets the active graph.
-
+    @data_parallel_size.setter
+    def data_parallel_size(self, size):
+        """ Property sets the number of GPUs in each data parallel group.
             Args:
-                graph: Neural graph object that will become active.
+                size (int):  Number of GPUs in each data parallel group.
         """
-        self._neural_graph_manager.active_graph = graph
+        self._data_parallel_size = size
+
+    @property
+    def local_rank(self):
+        """ Property returns the local rank.
+            Returns:
+                Local rank.
+        """
+        return self._local_rank
+
+    @local_rank.setter
+    def local_rank(self, rank):
+        """ Property sets the local rank.
+            Args:
+                rank (int):  Local rank.
+        """
+        self._local_rank = rank
+
+    @property
+    def global_rank(self):
+        """ Property returns the global rank.
+            Returns:
+                Global rank.
+        """
+        return self._global_rank
+
+    @global_rank.setter
+    def global_rank(self, rank):
+        """ Property sets the global rank.
+            Args:
+                rank (int):  Global rank.
+        """
+        self._global_rank = rank
+
+    @property
+    def model_parallel_rank(self):
+        """ Property returns the model parallel rank.
+            Returns:
+                Model parallel rank.
+        """
+        return self._model_parallel_rank
+
+    @model_parallel_rank.setter
+    def model_parallel_rank(self, rank):
+        """ Property sets the model parallel rank.
+            Args:
+                rank (int):  Model parallel rank.
+        """
+        self._model_parallel_rank = rank
+
+    @property
+    def model_parallel_group(self):
+        """ Property returns the model parallel group.
+            Returns:
+                Model parallel group.
+        """
+        return self._model_parallel_group
+
+    @model_parallel_group.setter
+    def model_parallel_group(self, group):
+        """ Property sets the model parallel group.
+            Args:
+                group:  Model parallel group.
+        """
+        self._model_parallel_group = group
+
+    @property
+    def data_parallel_rank(self):
+        """ Property returns the data parallel rank.
+            Returns:
+                Data parallel rank.
+        """
+        return self._data_parallel_rank
+
+    @data_parallel_rank.setter
+    def data_parallel_rank(self, rank):
+        """ Property sets the data parallel rank.
+            Args:
+                rank (int):  Data parallel rank.
+        """
+        self._data_parallel_rank = rank
+
+    @property
+    def data_parallel_group(self):
+        """ Property returns the data parallel group.
+            Returns:
+                Data parallel group.
+        """
+        return self._data_parallel_group
+
+    @data_parallel_group.setter
+    def data_parallel_group(self, group):
+        """ Property sets the data parallel group.
+            Args:
+                group:  Data parallel group.
+        """
+        self._data_parallel_group = group
+
+    @property
+    def random_seed(self):
+        """ Property returns the random seed.
+            Returns:
+                Random seed.
+        """
+        return self._random_seed
+
+    @random_seed.setter
+    def random_seed(self, seed):
+        """ Property sets the random seed.
+            Args:
+                seed (int):  Random seed.
+        """
+        self._random_seed = seed

@@ -1,7 +1,4 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['NeuralTypeComparisonResult']
-
 from enum import Enum
+
+__all__ = ['NeuralTypeComparisonResult']
 
 
 class NeuralTypeComparisonResult(Enum):
@@ -32,3 +29,4 @@ class NeuralTypeComparisonResult(Enum):
     CONTAINER_SIZE_MISMATCH = 5  # A and B contain different number of elements
     INCOMPATIBLE = 6  # A and B are incompatible
     SAME_TYPE_INCOMPATIBLE_PARAMS = 7  # A and B are of the same type but parametrized differently
+    UNCHECKED = 8  # type comparison wasn't done

@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -113,4 +113,3 @@ echo "Got enough data. Start resample!"
 python freesound_resample.py --data_dir="${DATADIR}" --resampled_dir="${RESAMPLE_DATADIR}"
 
 echo "Done resample data!"
-

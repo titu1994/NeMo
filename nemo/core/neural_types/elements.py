@@ -1,7 +1,4 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import abc
+from abc import ABC
+from typing import Dict, Optional, Tuple
+
+from nemo.core.neural_types.comparison import NeuralTypeComparisonResult
 
 __all__ = [
     'ElementType',
@@ -45,13 +48,14 @@ __all__ = [
     'StringType',
     'TokenIndex',
     'Length',
+    'IntType',
+    'NormalDistributionSamplesType',
+    'NormalDistributionMeanType',
+    'NormalDistributionLogVarianceType',
+    'TokenLogDurationType',
+    'LogDeterminantType',
+    'SequenceToSequenceAlignmentType',
 ]
-
-import abc
-from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple
-
-from nemo.core.neural_types.comparison import NeuralTypeComparisonResult
 
 
 class ElementType(ABC):
@@ -250,6 +254,10 @@ class StringLabel(StringType):
     """
 
 
+class BoolType(ElementType):
+    """Element type representing a single integer"""
+
+
 class IntType(ElementType):
     """Element type representing a single integer"""
 
@@ -260,3 +268,34 @@ class TokenIndex(IntType):
 
 class Length(IntType):
     """Type representing an element storing a "length" (e.g. length of a list)."""
+
+
+class ProbabilityDistributionSamplesType(ElementType):
+    """Element to represent tensors that meant to be sampled from a valid probability distribution
+    """
+
+
+class NormalDistributionSamplesType(ProbabilityDistributionSamplesType):
+    """Element to represent tensors that meant to be sampled from a valid normal distribution
+    """
+
+
+class SequenceToSequenceAlignmentType(ElementType):
+    """Class to represent the alignment from seq-to-seq attention outputs. Generally a mapping from endcoder time steps
+    to decoder time steps."""
+
+
+class NormalDistributionMeanType(ElementType):
+    """Element to represent the mean of a normal distribution"""
+
+
+class NormalDistributionLogVarianceType(ElementType):
+    """Element to represent the log variance of a normal distribution"""
+
+
+class TokenLogDurationType(ElementType):
+    """Element for representing the log-duration of a token"""
+
+
+class LogDeterminantType(ElementType):
+    """Element for representing log determinants usually used in flow models"""

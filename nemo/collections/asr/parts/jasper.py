@@ -1,16 +1,17 @@
-# Copyright (C) NVIDIA CORPORATION. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 from typing import Callable, List, Optional, Tuple
 
@@ -66,8 +67,27 @@ def get_same_padding(kernel_size, stride, dilation):
 
 
 class StatsPoolLayer(nn.Module):
-    def __init__(self, gram=False, super_vector=False):
+    def __init__(self, feat_in, pool_mode='xvector'):
         super().__init__()
+        self.feat_in = 0
+        if pool_mode == 'gram':
+            gram = True
+            super_vector = False
+        elif pool_mode == 'superVector':
+            gram = True
+            super_vector = True
+        else:
+            gram = False
+            super_vector = False
+
+        if gram:
+            self.feat_in += feat_in ** 2
+        else:
+            self.feat_in += 2 * feat_in
+
+        if super_vector and gram:
+            self.feat_in += 2 * feat_in
+
         self.gram = gram
         self.super = super_vector
 
@@ -82,7 +102,7 @@ class StatsPoolLayer(nn.Module):
             time_len = encoder_output.shape[-1]
             # encoder_output = encoder_output
             cov = encoder_output.bmm(encoder_output.transpose(2, 1))  # cov matrix
-            cov = cov.view(cov.shape[0], -1) / (time_len)
+            cov = cov.view(cov.shape[0], -1) / time_len
 
         if self.gram and not self.super:
             return cov
@@ -136,7 +156,7 @@ class MaskedConv1d(nn.Module):
     def get_seq_len(self, lens):
         return (
             lens + 2 * self.conv.padding[0] - self.conv.dilation[0] * (self.conv.kernel_size[0] - 1) - 1
-        ) / self.conv.stride[0] + 1
+        ) // self.conv.stride[0] + 1
 
     def forward(self, x, lens):
         if self.use_mask:
@@ -222,11 +242,12 @@ class SqueezeExcite(nn.Module):
         )
 
     def forward(self, x):
-        batch, channels, timesteps = x.size()
+        # The use of negative indices on the transpose allow for expanded SqueezeExcite
+        batch, channels, timesteps = x.size()[:3]
         y = self.pool(x)  # [B, C, T - context_window + 1]
-        y = y.transpose(1, 2)  # [B, T - context_window + 1, C]
+        y = y.transpose(1, -1)  # [B, T - context_window + 1, C]
         y = self.fc(y)  # [B, T - context_window + 1, C]
-        y = y.transpose(1, 2)  # [B, C, T - context_window + 1]
+        y = y.transpose(1, -1)  # [B, C, T - context_window + 1]
 
         if self.context_window > 0:
             y = torch.nn.functional.interpolate(y, size=timesteps, mode=self.interpolation_mode)

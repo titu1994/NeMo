@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,22 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import copy
 import os
-from functools import partial
 
-from ruamel.yaml import YAML
+import pytorch_lightning as pl
+from omegaconf.listconfig import ListConfig
+from pytorch_lightning import seed_everything
 
-import nemo
-import nemo.collections.asr as nemo_asr
-import nemo.utils.argparse as nm_argparse
-from nemo.collections.asr.helpers import (
-    monitor_classification_training_progress,
-    process_classification_evaluation_batch,
-    process_classification_evaluation_epoch,
-)
+from nemo.collections.asr.models import EncDecSpeakerLabelModel
+from nemo.core.config import hydra_runner
 from nemo.utils import logging
+<<<<<<< HEAD
 from nemo.utils.lr_policies import CosineAnnealing
 
 
@@ -290,4 +284,46 @@ def main():
 
 
 if __name__ == "__main__":
+=======
+from nemo.utils.exp_manager import exp_manager
+
+"""
+Basic run (on GPU for 10 epochs for 2 class training):
+EXP_NAME=sample_run
+python ./speaker_reco.py --config-path='conf' --config-name='SpeakerNet_recognition_3x2x512.yaml' \
+    trainer.max_epochs=10  \
+    model.train_ds.batch_size=64 model.validation_ds.batch_size=64 \
+    model.train_ds.manifest_filepath="<train_manifest>" model.validation_ds.manifest_filepath="<dev_manifest>" \
+    model.test_ds.manifest_filepath="<test_manifest>" \
+    trainer.gpus=1 \
+    model.decoder.params.num_classes=2 \
+    exp_manager.name=$EXP_NAME +exp_manager.use_datetime_version=False \
+    exp_manager.exp_dir='./speaker_exps'
+
+See https://github.com/NVIDIA/NeMo/blob/main/tutorials/speaker_recognition/Speaker_Recognition_Verification.ipynb for notebook tutorial
+"""
+
+seed_everything(42)
+
+
+@hydra_runner(config_path="conf", config_name="SpeakerNet_recognition_3x2x512.yaml")
+def main(cfg):
+
+    logging.info(f'Hydra config: {cfg.pretty()}')
+    trainer = pl.Trainer(**cfg.trainer)
+    log_dir = exp_manager(trainer, cfg.get("exp_manager", None))
+    speaker_model = EncDecSpeakerLabelModel(cfg=cfg.model, trainer=trainer)
+    trainer.fit(speaker_model)
+    model_path = os.path.join(log_dir, '..', 'spkr.nemo')
+    speaker_model.save_to(model_path)
+
+    if hasattr(cfg.model, 'test_ds') and cfg.model.test_ds.manifest_filepath is not None:
+        gpu = 1 if cfg.trainer.gpus != 0 else 0
+        trainer = pl.Trainer(gpus=gpu)
+        if speaker_model.prepare_test(trainer):
+            trainer.test(speaker_model)
+
+
+if __name__ == '__main__':
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
     main()

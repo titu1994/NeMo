@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+<<<<<<< HEAD
 # =============================================================================
 
 from nemo.backends.pytorch.common.losses import CrossEntropyLossNM
@@ -61,3 +62,17 @@ __all__ = [
     'CTCLossNM',
     'CrossEntropyLossNM',
 ]
+=======
+
+from nemo.collections.asr import data, losses, models, modules
+from nemo.package_info import __version__
+
+# Set collection version equal to NeMo version.
+__version = __version__
+
+# Authorship.
+__author__ = "NVIDIA Corporation"
+
+# Set collection name.
+__description__ = "Automatic Speech Recognition collection"
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6

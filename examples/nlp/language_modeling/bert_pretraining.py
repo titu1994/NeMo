@@ -1,5 +1,4 @@
-# =============================================================================
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,75 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# =============================================================================
-"""
 
-To pretrain BERT on raw uncased text dataset run
-python bert_pretraining.py \
---amp_opt_level "O0" \
---train_data path_to/wikitext-2/train.txt \
---eval_data path_to/wikitext-2/valid.txt \
---work_dir outputs/bert_lm \
---batch_size 64 \
---lr 0.01 \
---lr_policy CosineAnnealing \
---lr_warmup_proportion 0.05 \
---optimizer novograd \
---beta1 0.95 \
---beta2 0.25 \
---tokenizer sentence-piece \
---vocab_size 3200 \
---hidden_size 768 \
---intermediate_size 3072 \
---num_hidden_layers 12 \
---num_attention_heads 12 \
---hidden_act "gelu" \
---save_step_freq 200 \
-data_text \
---dataset_name wikitext-2 \
---num_epochs 10 \
---sample_size 10000000 \
---mask_probability 0.15 \
---short_seq_prob 0.1 \
 
-To pretrain BERT large on preprocessed dataset,
-download and preprocess dataset from here:
-https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/LanguageModeling/BERT/
-Run the script:
-./data/create_datasets_from_start.sh
-and extract data into train_data and eval_data
+import pytorch_lightning as pl
+from omegaconf import DictConfig
 
-Then run BERT large on dataset with a sequence length of 512 and a maximum of 80 masked tokens per sequence
-python -m torch.distributed.launch --nproc_per_node=8 bert_pretraining.py \
---batch_size 8 \
---config_file bert_config.json
---train_data train_data \
---eval_data eval_data \
---save_step_freq 200 \
---num_gpus 8 \
---amp_opt_level "O1" \
---lr_policy SquareRootAnnealing \
---beta1 0.9 \
---beta2 0.999 \
---lr_warmup_proportion 0.01 \
---optimizer adam_w \
---weight_decay 0.01 \
---lr 0.4375e-4 \
-data_preprocessed \
---max_predictions_per_seq 80 \
---num_iters 2285714  
+from nemo.collections.nlp.models.language_modeling import BERTLMModel
+from nemo.core.config import hydra_runner
+from nemo.utils import logging
+from nemo.utils.exp_manager import exp_manager
 
-BERT base uncased trained with 2285714 iterations on a DGX1 with 8 V100 GPUs with AMP O1 optimization
-should finish in 200 hours and yield EM/F1 of 82.74/89.79 on SQuADv1.1 and 71.24/74.32 on SQuADv2.0.
-On GLUE benchmark MRPC task the model achieves accuracy/F1 od 86.52/90.53.
 
-BERT large uncased trained with 2285714 iterations on a DGX1 with 8 V100 GPUs with AMP O1 optimization
-should finish in 410 hours and yield EM/F1 of 85.79/92.28 on SQuADv1.1 and 80.17/83.32 on SQuADv2.0.
-On GLUE benchmark MRPC task the model achieves accuracy/F1 od 88.7/91.96.
+@hydra_runner(config_path="conf", config_name="bert_pretraining_from_text_config")
+def main(cfg: DictConfig) -> None:
+    logging.info(f'Config:\n {cfg.pretty()}')
+    trainer = pl.Trainer(**cfg.trainer)
+    exp_manager(trainer, cfg.get("exp_manager", None))
+    bert_model = BERTLMModel(cfg.model, trainer=trainer)
+    trainer.fit(bert_model)
+    if cfg.model.nemo_path:
+        bert_model.save_to(cfg.model.nemo_path)
 
-More information about BERT pretraining can be found at 
-https://nvidia.github.io/NeMo/nlp/bert_pretraining.html
 
+<<<<<<< HEAD
 Pretrained BERT models and model configuration files can be found at 
 https://ngc.nvidia.com/catalog/models/nvidia:bertlargeuncasedfornemo
 https://ngc.nvidia.com/catalog/models/nvidia:bertbaseuncasedfornemo
@@ -475,3 +428,7 @@ nf.train(
     gradient_predivide=args.gradient_predivide,
     optimization_params=optimization_params,
 )
+=======
+if __name__ == '__main__':
+    main()
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6

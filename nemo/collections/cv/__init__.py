@@ -1,5 +1,4 @@
-# =============================================================================
-# Copyright (c) 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# =============================================================================
 
-from nemo.collections.cv.modules import *
+from nemo.collections.cv import datasets, losses, models, modules
+from nemo.package_info import __version__
 
-# __version__ = "0.1"
-# __name__ = "nemo.collections.cv"
+# Set collection version equal to NeMo version.
+__version = __version__
+
+# Authorship.
+__author__ = "NVIDIA Corporation"
+
+# Set collection name.
+__description__ = "Computer Vision collection"

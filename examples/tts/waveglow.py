@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,34 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
-import os
-from functools import partial
 
-import nemo
-import nemo.collections.asr as nemo_asr
-import nemo.collections.tts as nemo_tts
-import nemo.utils.argparse as nm_argparse
-from nemo.collections.tts import waveglow_eval_log_to_tb_func, waveglow_log_to_tb_func, waveglow_process_eval_batch
-from nemo.utils import logging
+import pytorch_lightning as pl
+
+from nemo.collections.common.callbacks import LogEpochTimeCallback
+from nemo.collections.tts.models import WaveGlowModel
+from nemo.core.config import hydra_runner
+from nemo.utils.exp_manager import exp_manager
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        parents=[nm_argparse.NemoArgParser()], description='Waveglow', conflict_handler='resolve',
-    )
-    parser.set_defaults(
-        checkpoint_dir=None,
-        optimizer="adam",
-        batch_size=12,
-        eval_batch_size=12,
-        lr=0.0001,
-        amp_opt_level="O1",
-        create_tb_writer=True,
-        lr_policy=None,
-        weight_decay=1e-6,
-    )
-
+<<<<<<< HEAD
     # Overwrite default args
     parser.add_argument("--max_steps", type=int, default=None, help="max number of steps to train")
     parser.add_argument("--num_epochs", type=int, default=None, help="number of epochs to train")
@@ -256,7 +238,17 @@ def main():
         },
         batches_per_step=args.iter_per_step,
     )
+=======
+@hydra_runner(config_path="conf", config_name="waveglow")
+def main(cfg):
+    trainer = pl.Trainer(**cfg.trainer)
+    exp_manager(trainer, cfg.get("exp_manager", None))
+    model = WaveGlowModel(cfg=cfg.model, trainer=trainer)
+    epoch_time_logger = LogEpochTimeCallback()
+    trainer.callbacks.extend([epoch_time_logger])
+    trainer.fit(model)
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 
 
 if __name__ == '__main__':
-    main()
+    main()  # noqa pylint: disable=no-value-for-parameter

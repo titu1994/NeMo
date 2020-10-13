@@ -1,4 +1,5 @@
 #!/bin/bash
+
 """
 This file is adapted from
 https://github.com/salesforce/awd-lstm-lm/blob/master/getdata.sh

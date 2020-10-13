@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import copy
-import json
 import os
 
-import numpy as np
-from ruamel.yaml import YAML
+import pytorch_lightning as pl
+from omegaconf.listconfig import ListConfig
+from pytorch_lightning import seed_everything
 
-import nemo
-import nemo.collections.asr as nemo_asr
-import nemo.utils.argparse as nm_argparse
+from nemo.collections.asr.models import ExtractSpeakerEmbeddingsModel
+from nemo.core.config import hydra_runner
 from nemo.utils import logging
+<<<<<<< HEAD
 
 
 def parse_args():
@@ -200,6 +198,46 @@ def main():
     np.save(name + '.npy', np.asarray(whole_embs))
     np.save(name + '_labels.npy', np.asarray(whole_labels))
     logging.info("Saved embedding files to {}".format(embedding_dir))
+=======
+from nemo.utils.exp_manager import exp_manager
+
+"""
+To extract embeddings
+Place pretrained model in ${EXP_DIR}/${EXP_NAME} with spkr.nemo
+    python spkr_get_emb.py --config-path='conf' --config-name='SpeakerNet_verification_3x2x512.yaml' \
+        +model.test_ds.manifest_filepath="<test_manifest_file>" \
+        +model.test_ds.sample_rate=16000 \
+        +model.test_ds.labels=null \
+        +model.test_ds.batch_size=1 \
+        +model.test_ds.shuffle=False \
+        +model.test_ds.time_length=8 \
+        exp_manager.exp_name=${EXP_NAME} \
+        exp_manager.exp_dir=${EXP_DIR} \
+        trainer.gpus=1 
+
+See https://github.com/NVIDIA/NeMo/blob/main/tutorials/speaker_recognition/Speaker_Recognition_Verification.ipynb for notebook tutorial
+"""
+
+seed_everything(42)
+
+
+@hydra_runner(config_path="conf", config_name="config")
+def main(cfg):
+
+    logging.info(f'Hydra config: {cfg.pretty()}')
+    if (isinstance(cfg.trainer.gpus, ListConfig) and len(cfg.trainer.gpus) > 1) or (
+        isinstance(cfg.trainer.gpus, (int, str)) and int(cfg.trainer.gpus) > 1
+    ):
+        logging.info("changing gpus to 1 to minimize DDP issues while extracting embeddings")
+        cfg.trainer.gpus = 1
+        cfg.trainer.distributed_backend = None
+    trainer = pl.Trainer(**cfg.trainer)
+    log_dir = exp_manager(trainer, cfg.get("exp_manager", None))
+    model_path = os.path.join(log_dir, '..', 'spkr.nemo')
+    speaker_model = ExtractSpeakerEmbeddingsModel.restore_from(model_path)
+    speaker_model.setup_test_data(cfg.model.test_ds)
+    trainer.test(speaker_model)
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 
 
 if __name__ == '__main__':

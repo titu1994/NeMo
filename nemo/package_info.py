@@ -1,7 +1,4 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-MAJOR = 0
-MINOR = 11
+
+MAJOR = 1
+MINOR = 0
 PATCH = 0
+<<<<<<< HEAD
 PRE_RELEASE = 'b12'
+=======
+PRE_RELEASE = 'b1'
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 
 # Use the following formatting: (major, minor, patch, pre-release)
 VERSION = (MAJOR, MINOR, PATCH, PRE_RELEASE)
@@ -29,9 +31,9 @@ __version__ = '.'.join(map(str, VERSION[:3])) + ''.join(VERSION[3:])
 __package_name__ = 'nemo_toolkit'
 __contact_names__ = 'NVIDIA'
 __contact_emails__ = 'nemo-toolkit@nvidia.com'
-__homepage__ = 'https://nvidia.github.io/NeMo/'
+__homepage__ = 'https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/'
 __repository_url__ = 'https://github.com/nvidia/nemo'
 __download_url__ = 'https://github.com/NVIDIA/NeMo/releases'
-__description__ = 'NEMO core package. Necessary for all collections'
+__description__ = 'NeMo - a toolkit for Conversational AI'
 __license__ = 'Apache2'
 __keywords__ = 'deep learning, machine learning, gpu, NLP, NeMo, nvidia, pytorch, torch, tts, speech, language'

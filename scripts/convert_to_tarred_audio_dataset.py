@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,10 +43,17 @@ parser.add_argument(
     help="Number of shards (tarballs) to create. Used for partitioning data among workers.",
 )
 parser.add_argument(
+    '--max_duration',
+    default=None,
+    type=float,
+    help='Maximum duration of audio clip in the dataset. By default, it is None and will not filter files.',
+)
+parser.add_argument(
     "--shuffle",
     action='store_true',
     help="Whether or not to randomly shuffle the samples in the manifest before tarring/sharding.",
 )
+parser.add_argument("--shuffle_seed", type=int, help="Random seed for use if shuffling is enabled.")
 args = parser.parse_args()
 
 
@@ -79,29 +86,42 @@ def main():
     manifest_path = args.manifest_path
     target_dir = args.target_dir
     num_shards = args.num_shards
+    max_duration = args.max_duration
     shuffle = args.shuffle
+    seed = args.shuffle_seed
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
     # Read the existing manifest
     entries = []
+    filtered_entries = 0
     with open(manifest_path, 'r') as m:
         for line in m:
-            entries.append(json.loads(line))
+            entry = json.loads(line)
+            if max_duration is not None and entry['duration'] < max_duration:
+                entries.append(entry)
+            else:
+                filtered_entries += 1
+
+    if filtered_entries > 0:
+        print(f"Filtered {filtered_entries} files with maximum duration > {max_duration} seconds.")
 
     if shuffle:
+        random.seed(seed)
         print("Shuffling...")
         random.shuffle(entries)
 
     # Create shards and updated manifest entries
     new_entries = []
+    print(f"Remainder: {len(entries) % num_shards}")
     for i in range(num_shards):
         start_idx = (len(entries) // num_shards) * i
         end_idx = start_idx + (len(entries) // num_shards)
+        print(f"Shard {i} has entries {start_idx} ~ {end_idx}")
         if i == num_shards - 1:
-            end_idx = len(entries)  # Last shard gets the leftovers.
-        print(f"Shard {i} will have {end_idx - start_idx} entries.")
+            # We discard in order to have the same number of entries per shard.
+            print(f"Have {len(entries) - end_idx} entries left over that will be discarded.")
 
         create_shard(entries[start_idx:end_idx], target_dir, new_entries, i)
 

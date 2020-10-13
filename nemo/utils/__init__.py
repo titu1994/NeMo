@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# =============================================================================
-# Copyright (c) 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# =============================================================================
 
+
+from nemo.utils.app_state import AppState
 from nemo.utils.nemo_logging import Logger as _Logger
 from nemo.utils.nemo_logging import LogMode as logging_mode
+from nemo.utils.lightning_logger_patch import add_memory_handlers_to_pl_logger
 
 logging = _Logger()
-
-from .argparse import NemoArgParser
-from .exp_logging import ExpManager, get_logger
-from .helpers import *
+add_memory_handlers_to_pl_logger()

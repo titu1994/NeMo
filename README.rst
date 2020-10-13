@@ -1,86 +1,67 @@
-.. image:: http://www.repostatus.org/badges/latest/active.svg
+ 
+|status| |license| |lgtm_grade| |lgtm_alerts| |black|
+
+.. |status| image:: http://www.repostatus.org/badges/latest/active.svg
   :target: http://www.repostatus.org/#active
   :alt: Project Status: Active – The project has reached a stable, usable state and is being actively developed.
 
-.. image:: https://img.shields.io/badge/documentation-github.io-blue.svg
-  :target: https://nvidia.github.io/NeMo/
-  :alt: NeMo documentation on GitHub pages
 
-.. image:: https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg
+.. |license| image:: https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg
   :target: https://github.com/NVIDIA/NeMo/blob/master/LICENSE
   :alt: NeMo core license and license for collections in this repo
 
-.. image:: https://img.shields.io/lgtm/grade/python/g/NVIDIA/NeMo.svg?logo=lgtm&logoWidth=18
+.. |lgtm_grade| image:: https://img.shields.io/lgtm/grade/python/g/NVIDIA/NeMo.svg?logo=lgtm&logoWidth=18
   :target: https://lgtm.com/projects/g/NVIDIA/NeMo/context:python
   :alt: Language grade: Python
 
-.. image:: https://img.shields.io/lgtm/alerts/g/NVIDIA/NeMo.svg?logo=lgtm&logoWidth=18
+.. |lgtm_alerts| image:: https://img.shields.io/lgtm/alerts/g/NVIDIA/NeMo.svg?logo=lgtm&logoWidth=18
   :target: https://lgtm.com/projects/g/NVIDIA/NeMo/alerts/
   :alt: Total alerts
 
-.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
+.. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
   :target: https://github.com/psf/black
   :alt: Code style: black
 
+**NVIDIA NeMo**
+===============
 
-
-NVIDIA NeMo
-===========
+Introduction
+------------
 
 NeMo is a toolkit for creating `Conversational AI <https://developer.nvidia.com/conversational-ai#started>`_ applications.
 
 NeMo toolkit makes it possible for researchers to easily compose complex neural network architectures for conversational AI using reusable components - Neural Modules.
 **Neural Modules** are conceptual blocks of neural networks that take *typed* inputs and produce *typed* outputs. Such modules typically represent data layers, encoders, decoders, language models, loss functions, or methods of combining activations.
 
-The toolkit comes with extendable collections of pre-built modules for automatic speech recognition (ASR), natural language processing (NLP) and text synthesis (TTS).
 
-Built for speed, NeMo can utilize NVIDIA's Tensor Cores and scale out training to multiple GPUs and multiple nodes. NeMo has integration with NVIDIA Jarvis.
+The toolkit comes with extendable collections of pre-built modules and ready-to-use models for:
 
-**Introduction**
+* `Automatic Speech Recognition (ASR) <https://ngc.nvidia.com/catalog/models/nvidia:nemospeechmodels>`_
+* `Natural Language Processing (NLP) <https://ngc.nvidia.com/catalog/models/nvidia:nemonlpmodels>`_
+* `Speech synthesis, or Text-To-Speech (TTS) <https://ngc.nvidia.com/catalog/models/nvidia:nemottsmodels>`_
 
-* Watch `this video <https://drive.google.com/a/nvidia.com/file/d/1AcOmtx4n1BAWvPoyhE0thcQXdloGWb6q/view?usp=sharing>`_ for a quick walk-through.
+Built for speed, NeMo can utilize NVIDIA's Tensor Cores and scale out training to multiple GPUs and multiple nodes.
 
-* `Documentation (latest released version) <https://nvidia.github.io/NeMo/>`_ and `Documentation (master branch) <http://nemo-master-docs.s3-website.us-east-2.amazonaws.com/>`_
+`NeMo product page. <https://developer.nvidia.com/nvidia-nemo>`_
 
-* Read NVIDIA `Developer Blog to learn how to develop speech recognition models for different languages <https://devblogs.nvidia.com/jump-start-training-for-speech-recognition-models-with-nemo/>`_
+`Introductory video. <https://www.youtube.com/embed/wBgpMf_KQVw>`_
 
-* Read NVIDIA `Developer Blog announcing NeMo <https://devblogs.nvidia.com/announcing-nemo-fast-development-of-speech-and-language-models/>`_
+.. raw:: html
 
-* Read NVIDIA `Developer Blog for example applications <https://devblogs.nvidia.com/how-to-build-domain-specific-automatic-speech-recognition-models-on-gpus/>`_
-
-* Read NVIDIA `Developer Blog for QuartzNet ASR model <https://devblogs.nvidia.com/develop-smaller-speech-recognition-models-with-nvidias-nemo-framework/>`_
-
-* Recommended version to install is **0.10.1** via ``pip install nemo-toolkit[all]``
-
-* Recommended NVIDIA `NGC NeMo Toolkit container <https://ngc.nvidia.com/catalog/containers/nvidia:nemo>`_
-
-* Pretrained models are available on NVIDIA `NGC Model repository <https://ngc.nvidia.com/catalog/models?orderBy=modifiedDESC&query=nemo&quickFilter=models&filters=>`_
+    <div style="position: relative; padding-bottom: 3%; height: 0; overflow: hidden; max-width: 100%; height: auto;">
+        <iframe width="560" height="315" src="https://www.youtube.com/embed/wBgpMf_KQVw" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
 
 
-Getting started
-~~~~~~~~~~~~~~~
+Requirements
+------------
 
-THE LATEST STABLE VERSION OF NeMo is **0.10.1** (Available via PIP).
-
-**Requirements**
+NeMo's works with:
 
 1) Python 3.6 or 3.7
-2) PyTorch 1.4.* with GPU support
-3) (optional, for best performance) NVIDIA APEX. Install from here: https://github.com/NVIDIA/apex
+2) Pytorch 1.6 or above
 
-
-Docker containers
-~~~~~~~~~~~~~~~~~
-
-**NeMo docker container**
-
-You can use NeMo's docker container with all dependencies pre-installed
-
-.. code-block:: bash
-
-    docker run --runtime=nvidia -it --rm -v --shm-size=16g -p 8888:8888 -p 6006:6006 --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/nemo:v0.10
-
-
+<<<<<<< HEAD
 If you are using the NVIDIA `NGC PyTorch container <https://ngc.nvidia.com/catalog/containers/nvidia:pytorch>`_ follow these instructions
 
 * Pull the docker: ``docker pull nvcr.io/nvidia/pytorch:20.01-py3``
@@ -101,119 +82,194 @@ See `examples/start_here` to get started with the simplest example.
 * `Speech Synthesis <https://nvidia.github.io/NeMo/tts/intro.html>`_
 
 Pre-trained models
+=======
+Docker containers:
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 ~~~~~~~~~~~~~~~~~~
+The easiest way to start training with NeMo is by using `NeMo's container <https://ngc.nvidia.com/catalog/containers/nvidia:nemo>`_.
 
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| Modality   | Model                                                                                        | Trained on            |
-+============+==============================================================================================+=======================+
-| ASR        | `Jasper10x5DR_En <https://ngc.nvidia.com/catalog/models/nvidia:multidataset_jasper10x5dr>`_  | LibriSpeech, WSJ,     |
-|            |                                                                                              | Mozilla Common Voice  |
-|            |                                                                                              | (en_1488h_2019-12-10),|
-|            |                                                                                              | Fisher, Switchboard,  |
-|            |                                                                                              | and Singapore English |
-|            |                                                                                              | National Speech Corpus|
-|            |                                                                                              | (Part 1)              |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| ASR        | `QuartzNet15x5En <https://ngc.nvidia.com/catalog/models/nvidia:multidataset_quartznet15x5>`_ | LibriSpeech, WSJ,     |
-|            |                                                                                              | Mozilla Common Voice  |
-|            |                                                                                              | (en_1087h_2019-06-12),|
-|            |                                                                                              | Fisher, and           |
-|            |                                                                                              | Switchboard           |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| ASR        | `QuartzNet15x5Zh <https://ngc.nvidia.com/catalog/models/nvidia:aishell2_quartznet15x5>`_     | AISHELL-2 Mandarin    |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| NLP        | `BERT base uncased <https://ngc.nvidia.com/catalog/models/nvidia:bertbaseuncasedfornemo>`_   |English Wikipedia and  |
-|            |                                                                                              |BookCorpus dataset     |
-|            |                                                                                              |seq len <= 512         |
-|            |                                                                                              |                       |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| NLP        | `BERT large uncased <https://ngc.nvidia.com/catalog/models/nvidia:bertlargeuncasedfornemo>`_ |English Wikipedia and  |
-|            |                                                                                              |BookCorpus dataset     |
-|            |                                                                                              |seq len <= 512         |
-|            |                                                                                              |                       |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| TTS        | `Tacotron2 <https://ngc.nvidia.com/catalog/models/nvidia:tacotron2_ljspeech>`_               |LJspeech               |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-| TTS        | `WaveGlow <https://ngc.nvidia.com/catalog/models/nvidia:waveglow_ljspeech>`_                 |LJspeech               |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-|            |                                                                                              |                       |
-+------------+----------------------------------------------------------------------------------------------+-----------------------+
-
-
-DEVELOPMENT
-~~~~~~~~~~~
-If you'd like to use master branch and/or develop NeMo you can run "reinstall.sh" script.
-
-`Documentation (master branch) <http://nemo-master-docs.s3-website.us-east-2.amazonaws.com/>`_.
-
-**Installing From Github**
-
-If you prefer to use NeMo's latest development version (from GitHub) follow the steps below:
-
-1) Clone the repository ``git clone https://github.com/NVIDIA/NeMo.git``
-2) Go to NeMo folder and re-install the toolkit with collections:
+It has all requirements and NeMo 1.0.0b1 already installed.
 
 .. code-block:: bash
 
-    ./reinstall.sh
+    docker run --gpus all -it --rm -v <nemo_github_folder>:/NeMo --shm-size=8g \
+    -p 8888:8888 -p 6006:6006 --ulimit memlock=-1 --ulimit \
+    stack=67108864 --device=/dev/snd nvcr.io/nvidia/nemo:v1.0.0b1
 
-**Style tests**
 
-.. code-block:: bash
-
-    python setup.py style  # Checks overall project code style and output issues with diff.
-    python setup.py style --fix  # Tries to fix error in-place.
-    python setup.py style --scope=tests  # Operates within certain scope (dir of file).
-
-** NeMo Test Suite**
-
-NeMo contains test suite divided into 5 subsets:
- 1) ``unit``: unit tests, i.e. testing a single, well isolated functionality
- 2) ``integration``: tests checking the elements when integrated into subsystems
- 3) ``system``: tests working at the highest integration level
- 4) ``acceptance``: tests checking whether the developed product/model passes the user defined acceptance criteria
- 5) ``docs``: tests related to documentation (deselect with '-m "not docs"')
-
-The user can run  all the tests locally by simply executing:
+If you chose to work with main branch, we recommend using NVIDIA's PyTorch container version 20.09-py3.
 
 .. code-block:: bash
 
-    pytest
-
-In order to run a subset of tests one can use the ``-m`` argument followed by the subset name, e.g. for ``system`` subset:
-
-.. code-block:: bash
-
-    pytest -m system
-
-By default, all the tests will be executed on GPU. There is also an option to run the test suite on CPU
-by passing the ``--cpu`` command line argument, e.g.:
-
-.. code-block:: bash
-
-    pytest -m unit --cpu
+    docker run --gpus all -it --rm -v <nemo_github_folder>:/NeMo --shm-size=8g \
+    -p 8888:8888 -p 6006:6006 --ulimit memlock=-1 --ulimit \
+    stack=67108864 --device=/dev/snd nvcr.io/nvidia/pytorch:20.09-py3
 
 
-Citation
+Installation
+~~~~~~~~~~~~
+If you are not inside the NVIDIA docker container, please install Cython first. If you wish to either use the ASR or TTS collection, please install libsndfile1 and ffmpeg as well.
+
+* ``pip install Cython``
+* ``apt-get update && apt-get install -y libsndfile1 ffmpeg`` (If you want to install the TTS or ASR collections)
+
+Once requirements are satisfied, simply install using pip:
+
+* ``pip install nemo_toolkit[all]==1.0.0b1`` (latest version)
+
+Or if you want the latest (or particular) version from GitHub:
+
+* ``python -m pip install git+https://github.com/NVIDIA/NeMo.git@{BRANCH}#egg=nemo_toolkit[all]`` - where {BRANCH} should be replaced with the branch you want. This is recommended route if you are testing out the latest WIP version of NeMo.
+* ``./reinstall.sh`` - from NeMo's git root. This will install the version from current branch in developement mode.
+
+Examples
 ~~~~~~~~
+``<nemo_github_folder>/examples/`` folder contains various example scripts. Many of them look very similar and have the same arguments because
+we used `Facebook's Hydra <https://github.com/facebookresearch/hydra>`_ for configuration.
 
-If you are using NeMo please cite the following publication
+Here is an example command which trains ASR model (QuartzNet15x5) on LibriSpeech, using 4 GPUs and mixed precision training.
+(It assumes you are inside the container with NeMo installed)
 
-.. code-block:: tex
+.. code-block:: bash
 
-    @misc{nemo2019,
-        title={NeMo: a toolkit for building AI applications using Neural Modules},
-        author={Oleksii Kuchaiev and Jason Li and Huyen Nguyen and Oleksii Hrinchuk and Ryan Leary and Boris Ginsburg and Samuel Kriman and Stanislav Beliaev and Vitaly Lavrukhin and Jack Cook and Patrice Castonguay and Mariya Popova and Jocelyn Huang and Jonathan M. Cohen},
-        year={2019},
-        eprint={1909.09577},
-        archivePrefix={arXiv},
-        primaryClass={cs.LG}
-    }
+    root@987b39669a7e:/NeMo# python examples/asr/speech_to_text.py --config-name=quartznet_15x5 \
+    model.train_ds.manifest_filepath=<PATH_TO_DATA>/librispeech-train-all.json \
+    model.validation_ds.manifest_filepath=<PATH_TO_DATA>/librispeech-dev-other.json \
+    trainer.gpus=4 trainer.max_epochs=128 model.train_ds.batch_size=64 \
+    +trainer.precision=16 +trainer.amp_level=O1  \
+    +model.validation_ds.num_workers=16  \
+    +model.train_ds.num_workers=16 \
+    +model.train_ds.pin_memory=True
 
+    #(Optional) Tensorboard:
+    tensorboard --bind_all --logdir nemo_experiments
+
+
+
+Documentation
+-------------
+
+.. |main| image:: https://readthedocs.com/projects/nvidia-nemo/badge/?version=main
+  :alt: Documentation Status
+  :scale: 100%
+  :target: https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/
+
+.. |latest| image:: https://readthedocs.com/projects/nvidia-nemo/badge/?version=main
+  :alt: Documentation Status
+  :scale: 100%
+  :target: https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/
+
+.. |stable| image:: https://readthedocs.com/projects/nvidia-nemo/badge/?version=stable
+  :alt: Documentation Status
+  :scale: 100%
+  :target: https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/
+
+.. |v0111| image:: https://readthedocs.com/projects/nvidia-nemo/badge/?version=v0.11.1
+  :alt: Documentation Status
+  :scale: 100%
+  :target: https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/v0.11.1/
+
+.. |v0110| image:: https://readthedocs.com/projects/nvidia-nemo/badge/?version=v0.11.0
+  :alt: Documentation Status
+  :scale: 100%
+  :target: https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/v0.11.0/
+
+
+
++---------+----------+---------------------------------------------------------+
+| Version | Status   | Description                                             |
++=========+==========+=========================================================+
+| Latest  | |latest| | Documentation of the latest (i.e. `main`) branch        |
++---------+----------+---------------------------------------------------------+
+| Stable  | |stable| | Documentation of the stable (i.e. `0.11.1`) branch      |
++---------+----------+---------------------------------------------------------+
+| Main    | |main|   | Documentation of the `main` branch                      |
++---------+----------+---------------------------------------------------------+
+| v0.11.1 | |v0111|  | Documentation of the v0.11.1 release                    |
++---------+----------+---------------------------------------------------------+
+| v0.11.0 | |v0110|  | Documentation of the v0.11.0 release                    |
++---------+----------+---------------------------------------------------------+
+
+
+Tutorials
+---------
+The best way to get started with NeMo is to checkout one of our tutorials.
+
+Most NeMo tutorials can be run on `Google's Colab <https://colab.research.google.com/notebooks/intro.ipynb>`_.
+
+To run tutorials:
+
+* Click on Colab link (see table below)
+* Connect to an instance with a GPU (Runtime -> Change runtime type -> select "GPU" for hardware accelerator)
+
+.. list-table:: *Tutorials*
+   :widths: 15 25 25
+   :header-rows: 1
+
+   * - Domain
+     - Title
+     - GitHub URL
+   * - NeMo
+     - Simple Application with NeMo
+     - `Voice swap app <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/NeMo_voice_swap_app.ipynb>`_
+   * - NeMo
+     - Exploring NeMo Fundamentals
+     - `NeMo primer <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/00_NeMo_Primer.ipynb>`_
+   * - NeMo Models
+     - Exploring NeMo Model Construction
+     - `NeMo models <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/01_NeMo_Models.ipynb>`_
+   * - ASR
+     - ASR with NeMo
+     - `ASR with NeMo <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/asr/01_ASR_with_NeMo.ipynb>`_
+   * - ASR
+     - Speech Commands
+     - `Speech commands <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/asr/03_Speech_Commands.ipynb>`_
+   * - ASR
+     - Speaker Recognition and Verification
+     - `Speaker Recognition and Verification <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/speaker_recognition/Speaker_Recognition_Verification.ipynb>`_
+   * - ASR
+     - Online Noise Augmentation
+     - `Online noise augmentation <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/asr/05_Online_Noise_Augmentation.ipynb>`_
+   * - NLP
+     - Using Pretrained Language Models for Downstream Tasks
+     - `Pretrained language models for downstream tasks <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/01_Pretrained_Language_Models_for_Downstream_Tasks.ipynb>`_
+   * - NLP
+     - Exploring NeMo NLP Tokenizers
+     - `NLP tokenizers <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/02_NLP_Tokenizers.ipynb>`_
+   * - NLP
+     - Text Classification (Sentiment Analysis) with BERT
+     - `Text Classification (Sentiment Analysis) <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Text_Classification_Sentiment_Analysis.ipynb>`_
+   * - NLP
+     - Question answering with SQuAD
+     - `Question answering Squad <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Question_Answering_Squad.ipynb>`_
+   * - NLP
+     - Token Classification (Named Entity Recognition)
+     - `Token classification: named entity recognition <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Token_Classification_Named_Entity_Recognition.ipynb>`_
+   * - NLP
+     - Joint Intent Classification and Slot Filling
+     - `Joint Intent and Slot Classification <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Joint_Intent_and_Slot_Classification.ipynb>`_
+   * - NLP
+     - GLUE Benchmark
+     - `GLUE benchmark <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/GLUE_Benchmark.ipynb>`_
+   * - NLP
+     - Punctuation and Capitialization
+     - `Punctuation and capitalization <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Punctuation_and_Capitalization.ipynb>`_
+   * - NLP
+     - Named Entity Recognition - BioMegatron
+     - `Named Entity Recognition - BioMegatron <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Token_Classification-BioMegatron.ipynb>`_
+   * - NLP
+     - Relation Extraction - BioMegatron
+     - `Relation Extraction - BioMegatron <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/nlp/Relation_Extraction-BioMegatron.ipynb>`_
+
+   * - TTS
+     - Speech Synthesis
+     - `TTS inference <https://colab.research.google.com/github/NVIDIA/NeMo/blob/main/tutorials/tts/1_TTS_inference.ipynb>`_
+
+Contributing
+------------
+
+We welcome community contributions! Please refer to the CONTRIBUTING.md for the process.
+
+License
+-------
+NeMo is under Apache 2.0 license.

@@ -1,7 +1,4 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['AxisKindAbstract', 'AxisKind', 'AxisType']
-
 from enum import Enum
 from typing import Optional
+
+__all__ = ['AxisKindAbstract', 'AxisKind', 'AxisType']
 
 
 class AxisKindAbstract(Enum):
@@ -45,6 +42,7 @@ class AxisKind(AxisKindAbstract):
     Height = 4
     Any = 5
     Sequence = 6
+    FlowGroup = 7
 
     def __repr__(self):
         return self.__str__()
@@ -66,6 +64,8 @@ class AxisKind(AxisKindAbstract):
             return AxisKind.Width
         elif _label == "h" or _label == "height":
             return AxisKind.Height
+        elif _label == "flowgroup":
+            return AxisKind.FlowGroup
         elif _label == "any":
             return AxisKind.Any
         else:

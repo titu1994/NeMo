@@ -1,5 +1,38 @@
-# Taken straight from Patter https://github.com/ryanleary/patter
-# TODO: review, and copyright and fix/add comments
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Copyright (c) 2018 Ryan Leary
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# This file contains code artifacts adapted from https://github.com/ryanleary/patter
+
 import random
 
 import librosa
@@ -16,7 +49,7 @@ class AudioSegment(object):
     :raises TypeError: If the sample data type is not float or int.
     """
 
-    def __init__(self, samples, sample_rate, target_sr=None, trim=False, trim_db=60):
+    def __init__(self, samples, sample_rate, target_sr=None, trim=False, trim_db=60, orig_sr=None):
         """Create audio segment from samples.
         Samples are convert float32 internally, with int scaled to [-1, 1].
         """
@@ -30,6 +63,8 @@ class AudioSegment(object):
         self._sample_rate = sample_rate
         if self._samples.ndim >= 2:
             self._samples = np.mean(self._samples, 1)
+
+        self._orig_sr = orig_sr if orig_sr is not None else sample_rate
 
     def __eq__(self, other):
         """Return whether two objects are equal."""
@@ -75,7 +110,7 @@ class AudioSegment(object):
 
     @classmethod
     def from_file(
-        cls, audio_file, target_sr=None, int_values=False, offset=0, duration=0, trim=False,
+        cls, audio_file, target_sr=None, int_values=False, offset=0, duration=0, trim=False, orig_sr=None,
     ):
         """
         Load a file supported by librosa and return as an AudioSegment.
@@ -97,10 +132,10 @@ class AudioSegment(object):
                 samples = f.read(dtype=dtype)
 
         samples = samples.transpose()
-        return cls(samples, sample_rate, target_sr=target_sr, trim=trim)
+        return cls(samples, sample_rate, target_sr=target_sr, trim=trim, orig_sr=orig_sr)
 
     @classmethod
-    def segment_from_file(cls, audio_file, target_sr=None, n_segments=0, trim=False):
+    def segment_from_file(cls, audio_file, target_sr=None, n_segments=0, trim=False, orig_sr=None):
         """Grabs n_segments number of samples from audio_file randomly from the
         file as opposed to at a specified offset.
 
@@ -117,7 +152,7 @@ class AudioSegment(object):
                 samples = f.read(dtype='float32')
 
         samples = samples.transpose()
-        return cls(samples, sample_rate, target_sr=target_sr, trim=trim)
+        return cls(samples, sample_rate, target_sr=target_sr, trim=trim, orig_sr=orig_sr)
 
     @property
     def samples(self):
@@ -139,6 +174,10 @@ class AudioSegment(object):
     def rms_db(self):
         mean_square = np.mean(self._samples ** 2)
         return 10 * np.log10(mean_square)
+
+    @property
+    def orig_sr(self):
+        return self._orig_sr
 
     def gain_db(self, gain):
         self._samples *= 10.0 ** (gain / 20.0)

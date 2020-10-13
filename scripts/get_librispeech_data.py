@@ -1,4 +1,16 @@
-# Copyright (c) 2019 NVIDIA Corporation
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
 # USAGE: python get_librispeech_data.py --data_root=<where to put data>
 #        --data_set=<datasets_to_download>
@@ -41,9 +53,7 @@ def __maybe_download_file(destination: str, source: str):
     Args:
         destination: local filepath
         source: url of resource
-
     Returns:
-
     """
     source = URLS[source]
     if not os.path.exists(destination):
@@ -72,9 +82,7 @@ def __process_data(data_folder: str, dst_folder: str, manifest_file: str):
         data_folder: source with flac files
         dst_folder: where wav files will be stored
         manifest_file: where to store manifest
-
     Returns:
-
     """
 
     if not os.path.exists(dst_folder):
@@ -101,7 +109,7 @@ def __process_data(data_folder: str, dst_folder: str, manifest_file: str):
                 # check duration
                 duration = subprocess.check_output("soxi -D {0}".format(wav_file), shell=True)
 
-                entry = dict()
+                entry = {}
                 entry['audio_filepath'] = os.path.abspath(wav_file)
                 entry['duration'] = float(duration)
                 entry['text'] = transcript_text

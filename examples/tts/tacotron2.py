@@ -1,4 +1,4 @@
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,27 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
-import math
-import os
-from functools import partial
 
-from ruamel.yaml import YAML
+import pytorch_lightning as pl
 
-import nemo
-import nemo.collections.asr as nemo_asr
-import nemo.collections.tts as nemo_tts
-import nemo.utils.argparse as nm_argparse
-from nemo.collections.tts import (
-    tacotron2_eval_log_to_tb_func,
-    tacotron2_log_to_tb_func,
-    tacotron2_process_eval_batch,
-    tacotron2_process_final_eval,
-)
-from nemo.utils import logging
-from nemo.utils.lr_policies import CosineAnnealing
+from nemo.collections.common.callbacks import LogEpochTimeCallback
+from nemo.collections.tts.models import Tacotron2Model
+from nemo.core.config import hydra_runner
+from nemo.utils.exp_manager import exp_manager
 
 
+<<<<<<< HEAD
 def parse_args():
     parser = argparse.ArgumentParser(
         parents=[nm_argparse.NemoArgParser()], description='Tacotron2', conflict_handler='resolve',
@@ -414,7 +403,18 @@ def main():
         },
         batches_per_step=args.iter_per_step,
     )
+=======
+@hydra_runner(config_path="conf", config_name="tacotron2")
+def main(cfg):
+    trainer = pl.Trainer(**cfg.trainer)
+    exp_manager(trainer, cfg.get("exp_manager", None))
+    model = Tacotron2Model(cfg=cfg.model, trainer=trainer)
+    lr_logger = pl.callbacks.LearningRateLogger()
+    epoch_time_logger = LogEpochTimeCallback()
+    trainer.callbacks.extend([lr_logger, epoch_time_logger])
+    trainer.fit(model)
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
 
 
 if __name__ == '__main__':
-    main()
+    main()  # noqa pylint: disable=no-value-for-parameter

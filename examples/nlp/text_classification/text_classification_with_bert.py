@@ -1,5 +1,4 @@
-# =============================================================================
-# Copyright 2020 NVIDIA. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+<<<<<<< HEAD
 # =============================================================================
 
 import argparse
@@ -178,59 +178,195 @@ def create_pipeline(num_samples=-1, batch_size=32, num_gpus=1, mode='train', is_
 
     if is_training:
         tensors_to_evaluate = [loss, logits]
+=======
+
+"""
+This script contains an example on how to train, evaluate and perform inference with the TextClassificationModel.
+TextClassificationModel in NeMo supports text classification problems such as sentiment analysis or
+domain/intent detection for dialogue systems, as long as the data follows the format specified below.
+
+***Data format***
+TextClassificationModel requires the data to be stored in TAB separated files (.tsv) with two columns of sentence and
+label. Each line of the data file contains text sequences, where words are separated with spaces and label separated
+with [TAB], i.e.:
+
+[WORD][SPACE][WORD][SPACE][WORD][TAB][LABEL]
+
+For example:
+
+hide new secretions from the parental units[TAB]0
+that loves its characters and communicates something rather beautiful about human nature[TAB]1
+...
+
+If your dataset is stored in another format, you need to convert it to this format to use the TextClassificationModel.
+
+
+***Setting the configs***
+The model and the PT trainer are defined in a config file which declares multiple important sections.
+The most important ones are:
+    model: All arguments that are related to the Model - language model, tokenizer, head classifier, optimizer,
+            schedulers, and datasets/data loaders.
+    trainer: Any argument to be passed to PyTorch Lightning including number of epochs, number of GPUs,
+            precision level, etc.
+
+This script uses the `/examples/nlp/text_classification/conf/text_classification_config.yaml` default config file
+by default. You may update the config file from the file directly or by using the command line arguments.
+Other option is to set another config file via command line arguments by `--config-name=CONFIG_FILE_PATH'.
+
+You first need to set the num_classes in the config file which specifies the number of classes in the dataset.
+Notice that some config lines, including `model.dataset.classes_num`, have `???` as their value, this means that values
+for these fields are required to be specified by the user. We need to specify and set the `model.train_ds.file_name`,
+`model.validation_ds.file_name`, and `model.test_ds.file_name` in the config file to the paths of the train, validation,
+ and test files if they exist. We may do it by updating the config file or by setting them from the command line.
+
+
+***How to run the script?***
+For example the following would train a model for 50 epochs in 2 GPUs on a classification task with 2 classes:
+
+# python text_classification_with_bert.py
+        model.dataset.num_classes=2
+        model.train_ds=PATH_TO_TRAIN_FILE
+        model.validation_ds=PATH_TO_VAL_FILE
+        trainer.max_epochs=50
+        trainer.gpus=2
+
+This script would also reload the last checkpoint after the training is done and does evaluation on the dev set,
+then performs inference on some sample queries.
+
+By default, this script uses examples/nlp/text_classification/conf/text_classifciation_config.py config file, and
+you may update all the params in the config file from the command line. You may also use another config file like this:
+
+# python text_classification_with_bert.py --config-name==PATH_TO_CONFIG_FILE
+        model.dataset.num_classes=2
+        model.train_ds=PATH_TO_TRAIN_FILE
+        model.validation_ds=PATH_TO_VAL_FILE
+        trainer.max_epochs=50
+        trainer.gpus=2
+
+"""
+import os
+
+import pytorch_lightning as pl
+import torch
+from omegaconf import DictConfig, OmegaConf
+
+from nemo.collections.nlp.models.text_classification import TextClassificationModel
+from nemo.core.config import hydra_runner
+from nemo.utils import logging
+from nemo.utils.exp_manager import exp_manager
+
+
+@hydra_runner(config_path="conf", config_name="text_classification_config")
+def main(cfg: DictConfig) -> None:
+    logging.info(f'\nConfig Params:\n{cfg.pretty()}')
+    trainer = pl.Trainer(**cfg.trainer)
+    exp_manager(trainer, cfg.get("exp_manager", None))
+
+    if not cfg.model.train_ds.file_path:
+        raise ValueError("'train_ds.file_path' need to be set for the training!")
+
+    model = TextClassificationModel(cfg.model, trainer=trainer)
+    logging.info("===========================================================================================")
+    logging.info('Starting training...')
+    trainer.fit(model)
+    logging.info('Training finished!')
+    logging.info("===========================================================================================")
+
+    if cfg.model.nemo_path:
+        model.save_to(cfg.model.nemo_path)
+        logging.info(f'Model is saved into `.nemo` file: {cfg.model.nemo_path}')
+
+    # We evaluate the trained model on the test set if test_ds is set in the config file
+    if cfg.model.test_ds.file_path:
+        logging.info("===========================================================================================")
+        logging.info("Starting the testing of the trained model on test set...")
+        # The latest checkpoint would be used, set ckpt_path to 'best' to use the best one
+        trainer.test(model=model, ckpt_path=None, verbose=False)
+        logging.info("Testing finished!")
+        logging.info("===========================================================================================")
+
+    # retrieve the path to the last checkpoint of the training
+    if trainer.checkpoint_callback is not None:
+        checkpoint_path = os.path.join(
+            trainer.checkpoint_callback.dirpath, trainer.checkpoint_callback.prefix + "end.ckpt"
+        )
     else:
-        tensors_to_evaluate = [logits, labels]
+        checkpoint_path = None
+    """
+    After model training is done, if you have saved the checkpoints, you can create the model from 
+    the checkpoint again and evaluate it on a data file. 
+    You need to set or pass the test dataloader, and also create a trainer for this.
+    """
+    if checkpoint_path and os.path.exists(checkpoint_path) and cfg.model.validation_ds.file_path:
+        logging.info("===========================================================================================")
+        logging.info("Starting the evaluating the the last checkpoint on a data file (validation set by default)...")
+        # we use the the path of the checkpoint from last epoch from the training, you may update it to any checkpoint
+        # Create an evaluation model and load the checkpoint
+        eval_model = TextClassificationModel.load_from_checkpoint(checkpoint_path=checkpoint_path)
 
-    return tensors_to_evaluate, loss, steps_per_epoch, data_layer
+        # create a dataloader config for evaluation, the same data file provided in validation_ds is used here
+        # file_path can get updated with any file
+        eval_config = OmegaConf.create(
+            {'file_path': cfg.model.validation_ds.file_path, 'batch_size': 64, 'shuffle': False}
+        )
+        eval_model.setup_test_data(test_data_config=eval_config)
+
+        # a new trainer is created to show how to evaluate a checkpoint from an already trained model
+        # create a copy of the trainer config and update it to be used for final evaluation
+        eval_trainer_cfg = cfg.trainer.copy()
+
+        # it is safer to perform evaluation on single GPU without ddp as we are creating second trainer in
+        # the same script, and it can be a problem with multi-GPU training.
+        # We also need to reset the environment variable PL_TRAINER_GPUS to prevent PT from initializing ddp.
+        # When evaluation and training scripts are in separate files, no need for this resetting.
+        eval_trainer_cfg.gpus = 1 if torch.cuda.is_available() else 0
+        eval_trainer_cfg.distributed_backend = None
+        eval_trainer = pl.Trainer(**eval_trainer_cfg)
+
+        eval_trainer.test(model=eval_model, verbose=False)  # test_dataloaders=eval_dataloader,
+
+        logging.info("Evaluation the last checkpoint finished!")
+        logging.info("===========================================================================================")
+>>>>>>> fd98a89adf80012987851a2cd3c3f4dc63bb8db6
+    else:
+        logging.info(
+            "No file_path was set for validation_ds or no checkpoint was found, so final evaluation is skipped!"
+        )
+
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        # You may create a model from a saved chechpoint and use the model.infer() method to
+        # perform inference on a list of queries. There is no need of any trainer for inference.
+        logging.info("===========================================================================================")
+        logging.info("Starting the inference on some sample queries...")
+        queries = [
+            'by the end of no such thing the audience , like beatrice , has a watchful affection for the monster .',
+            'director rob marshall went out gunning to make a great one .',
+            'uneasy mishmash of styles and genres .',
+        ]
+
+        # use the path of the last checkpoint from the training, you may update it to any other checkpoints
+        infer_model = TextClassificationModel.load_from_checkpoint(checkpoint_path=checkpoint_path)
+
+        # move the model to the desired device for inference
+        # we move the model to "cuda" if available otherwise "cpu" would be used
+        if torch.cuda.is_available():
+            infer_model.to("cuda")
+        else:
+            infer_model.to("cpu")
+
+        # max_seq_length=512 is the maximum length BERT supports.
+        results = infer_model.classifytext(queries=queries, batch_size=16, max_seq_length=512)
+
+        logging.info('The prediction results of some sample queries with the trained model:')
+        for query, result in zip(queries, results):
+            logging.info(f'Query : {query}')
+            logging.info(f'Predicted label: {result}')
+
+        logging.info("Inference finished!")
+        logging.info("===========================================================================================")
+    else:
+        logging.info("Inference is skipped as no checkpoint was found from the training!")
 
 
-train_tensors, train_loss, steps_per_epoch, _ = create_pipeline(
-    num_samples=args.num_train_samples,
-    batch_size=args.batch_size,
-    num_gpus=args.num_gpus,
-    mode=args.train_file_prefix,
-    is_training=True,
-)
-logging.info(f"Steps_per_epoch = {steps_per_epoch}")
-
-eval_tensors, _, _, data_layer = create_pipeline(
-    num_samples=args.num_eval_samples,
-    batch_size=args.batch_size,
-    num_gpus=args.num_gpus,
-    mode=args.eval_file_prefix,
-    is_training=False,
-)
-
-# Create callbacks for train and eval modes
-train_callback = nemo.core.SimpleLossLoggerCallback(
-    tensors=train_tensors,
-    print_func=lambda x: logging.info("Loss: {:.3f}".format(x[0].item())),
-    tb_writer=nf.tb_writer,
-    get_tb_values=lambda x: [["loss", x[0]]],
-    step_freq=args.loss_step_freq,
-)
-
-eval_callback = nemo.core.EvaluatorCallback(
-    eval_tensors=eval_tensors,
-    user_iter_callback=lambda x, y: eval_iter_callback(x, y, data_layer),
-    user_epochs_done_callback=lambda x: eval_epochs_done_callback(x, f'{nf.work_dir}/graphs'),
-    tb_writer=nf.tb_writer,
-    eval_step=args.eval_step_freq,
-)
-
-# Create callback to save checkpoints
-ckpt_callback = nemo.core.CheckpointCallback(
-    folder=nf.checkpoint_dir, epoch_freq=args.save_epoch_freq, step_freq=args.save_step_freq
-)
-
-lr_policy_fn = get_lr_policy(
-    args.lr_policy, total_steps=args.num_epochs * steps_per_epoch, warmup_ratio=args.lr_warmup_proportion
-)
-
-nf.train(
-    tensors_to_optimize=[train_loss],
-    callbacks=[train_callback, eval_callback, ckpt_callback],
-    lr_policy=lr_policy_fn,
-    optimizer=args.optimizer_kind,
-    optimization_params={"num_epochs": args.num_epochs, "lr": args.lr, "weight_decay": args.weight_decay},
-)
+if __name__ == '__main__':
+    main()
