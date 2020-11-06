@@ -45,27 +45,25 @@ model:
     joint_hidden: 320
 
   preprocessor:
-    cls: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
-    params:
-      sample_rate: *sample_rate
-      normalize: "per_feature"
-      window_size: 0.025
-      window_stride: 0.01
-      window: "hann"
-      features: &n_mels 80
-      n_fft: 512
-      frame_splicing: 1
-      dither: 0.00001
-      pad_to: 16
-      stft_conv: false
+    _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
+    sample_rate: *sample_rate
+    normalize: "per_feature"
+    window_size: 0.025
+    window_stride: 0.01
+    window: "hann"
+    features: &n_mels 80
+    n_fft: 512
+    frame_splicing: 1
+    dither: 0.00001
+    pad_to: 16
+    stft_conv: false
 
   spec_augment:
-    cls: nemo.collections.asr.modules.SpectrogramAugmentation
-    params:
-      freq_masks: 2
-      time_masks: 2
-      freq_width: 27
-      time_width: 0.05
+    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
+    freq_masks: 2
+    time_masks: 2
+    freq_width: 27
+    time_width: 0.05
 
   encoder:
     _target_: nemo.collections.asr.modules.ConvASREncoder
