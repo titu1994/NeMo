@@ -45,8 +45,8 @@ model:
     se_context_size: -1
     # encoder / decoder values
     enc_hidden: 480
-    pred_hidden: 64
-    joint_hidden: 100
+    pred_hidden: 320
+    joint_hidden: 640
 
   preprocessor:
     _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
