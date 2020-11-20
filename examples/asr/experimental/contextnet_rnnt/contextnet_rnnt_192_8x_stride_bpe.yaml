@@ -418,3 +418,5 @@ exp_manager:
   wandb_logger_kwargs:
     name: null
     project: null
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: false
