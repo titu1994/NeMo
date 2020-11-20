@@ -24,6 +24,7 @@ from torch.optim.optimizer import Optimizer
 
 from nemo.core.config import OptimizerParams, get_optimizer_config, register_optimizer_params
 from nemo.core.optim.novograd import Novograd
+from nemo.core.optim.sm3 import SM3
 
 __all__ = ['get_optimizer', 'register_optimizer', 'parse_optimizer_args']
 
@@ -38,6 +39,7 @@ AVAILABLE_OPTIMIZERS = {
     'rmsprop': rmsprop.RMSprop,
     'rprop': rprop.Rprop,
     'novograd': Novograd,
+    'sm3': SM3,
 }
 
 

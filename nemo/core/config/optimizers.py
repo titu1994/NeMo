@@ -205,6 +205,30 @@ class NovogradParams(OptimizerParams):
     luc_eps: float = 1e-8
 
 
+@dataclass
+class SM3Params(OptimizerParams):
+    """
+    Configuration of the SM3 optimizer.
+
+    It has been proposed  in "Memory Efficient Adaptive Optimization"
+    (https://papers.nips.cc/paper/2019/file/8f1fa0193ca2b5d2fa0695827d8270e9)
+
+    Args:
+        lr (float, optional): learning rate (default: 1e-3)
+        betas (Tuple[float, float], optional): coefficients used for computing
+            running averages of gradient and its square (default: (0.9, 0.999))
+        eps (float, optional): term added to the denominator to improve
+            numerical stability (default: 1e-8)
+        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
+        amsgrad (boolean, optional): whether to use the AMSGrad variant of this
+            algorithm from the paper "On the Convergence of Adam and Beyond"
+    """
+
+    momentum: float = 0.0
+    beta: float = 0.0
+    eps: float = 1e-30
+
+
 def register_optimizer_params(name: str, optimizer_params: OptimizerParams):
     """
     Checks if the optimizer param name exists in the registry, and if it doesnt, adds it.
@@ -262,4 +286,5 @@ AVAILABLE_OPTIMIZER_PARAMS = {
     'adamw_params': AdamWParams,
     'rmsprop_params': RMSpropParams,
     'rprop_params': RpropParams,
+    'sm3_params': SM3Params,
 }
