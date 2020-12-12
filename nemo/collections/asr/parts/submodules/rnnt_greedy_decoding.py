@@ -467,7 +467,7 @@ class GreedyBatchedRNNTInfer(_GreedyRNNTInfer):
                 symbols_added = 0
 
                 # Reset blank mask
-                blank_mask.mul_(False)
+                blank_mask.mul_(0)
 
                 # Update blank mask with time mask
                 # Batch: [B, T, D], but Bi may have seq len < max(seq_lens_in_batch)
@@ -613,7 +613,7 @@ class GreedyBatchedRNNTInfer(_GreedyRNNTInfer):
             symbols_added = 0
 
             # Reset blank mask
-            blank_mask.mul_(False)
+            blank_mask.mul_(0)
 
             # Update blank mask with time mask
             # Batch: [B, T, D], but Bi may have seq len < max(seq_lens_in_batch)
