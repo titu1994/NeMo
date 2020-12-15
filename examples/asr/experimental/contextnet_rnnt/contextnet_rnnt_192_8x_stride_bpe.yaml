@@ -1,8 +1,11 @@
 name: &name "ContextNet-192-8x-Stride"
 
+# kernel: \[([0-9]+)\]
+# filters: ([0-9]+)
+
 model:
   sample_rate: &sample_rate 16000
-  compute_eval_loss: true
+  compute_eval_loss: false
 
   tokenizer:
     dir: ???  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (for wpe)
