@@ -65,6 +65,37 @@ def get_same_padding(kernel_size, stride, dilation):
     return kernel_size // 2
 
 
+class ParallelBlock(nn.Module):
+    def __init__(self, layers):
+        super(ParallelBlock, self).__init__()
+        self.layers = layers
+
+    def forward(self, input_: Tuple[List[Tensor], Optional[Tensor]]):
+        # type: (Tuple[List[Tensor], Optional[Tensor]]) -> Tuple[List[Tensor], Optional[Tensor]] # nopep8
+
+        xs = input_[0]
+        if len(input_) == 2:
+            xs, _ = input_
+
+        output_sum = None
+        output_lens = None
+        for layer in self.layers:
+            out_list, lens = layer(input_)
+
+            if output_sum is None:
+                output_sum = out_list[-1]
+            else:
+                output_sum = output_sum + out_list[-1]
+
+            if output_lens is None:
+                output_lens = lens
+
+        # add residual
+        outputs = output_sum + xs
+
+        return [outputs], output_lens
+
+
 class StatsPoolLayer(nn.Module):
     def __init__(self, feat_in, pool_mode='xvector'):
         super().__init__()
