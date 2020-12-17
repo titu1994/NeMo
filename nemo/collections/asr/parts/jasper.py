@@ -68,7 +68,7 @@ def get_same_padding(kernel_size, stride, dilation):
 class ParallelBlock(nn.Module):
     def __init__(self, layers):
         super(ParallelBlock, self).__init__()
-        self.layers = layers
+        self.layers = torch.nn.Sequential(*layers)
 
     def forward(self, input_: Tuple[List[Tensor], Optional[Tensor]]):
         # type: (Tuple[List[Tensor], Optional[Tensor]]) -> Tuple[List[Tensor], Optional[Tensor]] # nopep8
@@ -76,6 +76,7 @@ class ParallelBlock(nn.Module):
         xs = input_[0]
         if len(input_) == 2:
             xs, _ = input_
+            xs = xs[-1]
 
         output_sum = None
         output_lens = None

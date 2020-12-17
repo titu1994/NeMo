@@ -325,6 +325,7 @@ class ParallelConvASREncoder(NeuralModule, Exportable):
                     )
                 )
             else:
+                logging.info(f"Constructing parallel blocks with kernels : {lcfg['kernel']}")
                 parallel_blocks = []
                 for kernel_ in lcfg['kernel']:
                     kernel_ = [kernel_]
