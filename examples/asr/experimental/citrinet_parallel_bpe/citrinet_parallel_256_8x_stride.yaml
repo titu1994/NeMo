@@ -31,6 +31,7 @@ model:
     separable: true
     se: true
     se_context_size: -1
+    se_repeat: true
 
   tokenizer:
     dir: ???  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (for wpe)
@@ -74,6 +75,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
 
       - filters: 256
         repeat: ${model.model_defaults.repeat}
@@ -85,6 +87,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
         stride_last: true
         residual_mode: "stride_add"
 
@@ -98,6 +101,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
 
       - filters: 256
         repeat: ${model.model_defaults.repeat}
@@ -109,6 +113,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
         stride_last: true
         residual_mode: "stride_add"
 
@@ -122,6 +127,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
 
       - filters: 512
         repeat: ${model.model_defaults.repeat}
@@ -133,6 +139,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
         stride_last: true
         residual_mode: "stride_add"
 
@@ -146,6 +153,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
 
       - filters: &enc_final 640
         repeat: 1
@@ -157,6 +165,7 @@ model:
         separable: ${model.model_defaults.separable}
         se: ${model.model_defaults.se}
         se_context_size: ${model.model_defaults.se_context_size}
+        se_repeat: ${model.model_defaults.se_repeat}
 
 
   decoder:
