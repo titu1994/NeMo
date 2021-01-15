@@ -316,6 +316,7 @@ class JasperBlock(nn.Module):
         se_reduction_ratio=16,
         se_context_window=None,
         se_interpolation_mode='nearest',
+        se_repeat=False,
         stride_last=False,
     ):
         super(JasperBlock, self).__init__()
@@ -360,6 +361,17 @@ class JasperBlock(nn.Module):
                     norm_groups=norm_groups,
                 )
             )
+
+            if se and se_repeat:
+                conv.append(
+                    SqueezeExcite(
+                        planes,
+                        reduction_ratio=se_reduction_ratio,
+                        context_window=se_context_window,
+                        interpolation_mode=se_interpolation_mode,
+                        activation=activation,
+                    )
+                )
 
             conv.extend(self._get_act_dropout_layer(drop_prob=dropout, activation=activation))
 
