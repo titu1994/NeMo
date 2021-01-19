@@ -27,7 +27,7 @@ model:
 
   model_defaults:
     repeat: 5
-    dropout: 0.1
+    dropout: 0.0
     separable: true
     se: true
     se_context_size: -1
