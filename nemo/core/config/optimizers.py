@@ -203,6 +203,7 @@ class NovogradParams(OptimizerParams):
     luc: bool = False
     luc_trust: float = 1e-3
     luc_eps: float = 1e-8
+    norm_guard: Optional[float] = None
 
 
 @dataclass

@@ -54,6 +54,7 @@ class Novograd(Optimizer):
         weight_decay=0,
         grad_averaging=False,
         amsgrad=False,
+        norm_guard=None,
         luc=False,
         luc_trust=1e-3,
         luc_eps=1e-8,
@@ -61,6 +62,7 @@ class Novograd(Optimizer):
         _check_valid_opt_params(lr, eps, betas)
         defaults = dict(
             lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, grad_averaging=grad_averaging, amsgrad=amsgrad,
+            norm_guard=norm_guard
         )
         self.luc = luc
         self.luc_trust = luc_trust
@@ -125,7 +127,13 @@ class Novograd(Optimizer):
                 else:
                     denom = exp_avg_sq.sqrt().add_(group["eps"])
 
-                grad.div_(denom)
+                norm_guard = group["norm_guard"]
+                if norm_guard is not None:
+                    if denom >= norm_guard:
+                        grad.div_(denom)
+                else:
+                    grad.div_(denom)
+
                 if group["weight_decay"] != 0:
                     grad.add_(p.data, alpha=group["weight_decay"])
                 if group["grad_averaging"]:
