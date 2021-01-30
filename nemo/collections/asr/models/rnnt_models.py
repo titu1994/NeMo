@@ -152,6 +152,14 @@ class EncDecRNNTModel(ASRModel, ASRModuleMixin, ExportableEncDecJointModel):
             self._optim_variational_noise_std = 0
             self._optim_variational_noise_start = 0
 
+        # Setup normalized gradients for model
+        if 'normalize_joint' in self.cfg:
+            self._optim_normalize_joint = self.cfg.normalize_joint
+            self._optim_normalize_txu = None
+        else:
+            self._optim_normalize_joint = False
+            self._optim_normalize_txu = None
+
         # Setup normalized gradients for model joint by T x U scaling factor (joint length normalization)
         self._optim_normalize_joint_txu = self.cfg.get('normalize_joint_txu', False)
         self._optim_normalize_txu = None
