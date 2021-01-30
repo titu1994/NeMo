@@ -133,6 +133,14 @@ class EncDecRNNTModel(ASRModel):
             self._optim_variational_noise_std = 0
             self._optim_variational_noise_start = 0
 
+        # Setup normalized gradients for model
+        if 'normalize_joint' in self.cfg:
+            self._optim_normalize_joint = self.cfg.normalize_joint
+            self._optim_normalize_txu = None
+        else:
+            self._optim_normalize_joint = False
+            self._optim_normalize_txu = None
+
     @torch.no_grad()
     def transcribe(
         self, paths2audio_files: List[str], batch_size: int = 4, return_hypotheses: bool = False
@@ -502,6 +510,10 @@ class EncDecRNNTModel(ASRModel):
         # Log items
         self.log_dict(tensorboard_logs)
 
+        # Preserve batch acoustic model T and language model U parameters if normalizing
+        if self._optim_normalize_joint:
+            self._optim_normalize_txu = [encoded_len.max(), transcript_len.max()]
+
         return {'loss': loss_value}
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
@@ -638,3 +650,15 @@ class EncDecRNNTModel(ASRModel):
                         dtype=param.dtype,
                     )
                     param.grad.data.add_(noise)
+
+        if self._optim_normalize_joint:
+            T, U = self._optim_normalize_txu
+            if T is not None and U is not None:
+                logging.info(f"Normalizing gradient by {T}x{U}")
+                for param_name, param in self.encoder.named_parameters():
+                    if param.grad is not None:
+                        param.grad.data.div_(U)
+
+                for param_name, param in self.decoder.named_parameters():
+                    if param.grad is not None:
+                        param.grad.data.div_(T)
