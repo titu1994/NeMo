@@ -148,7 +148,7 @@ class TestNormalization:
         x = torch.randn(32, 1024, 256)  # [B, C, T]
         x2 = x.clone()
         torch_ln = torch.nn.LayerNorm(256, eps=1e-5)
-        broadcast_ln = normalization.BroadcastLayerNorm(256, dim=[None, 1], eps=1e-5)
+        broadcast_ln = normalization.BroadcastLayerNorm(256, dim=[None, 2], eps=1e-5)
 
         # output of pytorch layer norm
         orig_ln = torch_ln(x)
@@ -161,3 +161,24 @@ class TestNormalization:
         diff = orig_ln - brod_ln
         assert torch.abs(diff).mean() <= 1e-7
         assert torch.square(diff).mean() <= 1e-10
+
+    @pytest.mark.unit
+    def test_broadcast_layer_norm_last_dim_incorrect(self):
+        x = torch.randn(32, 1024, 256)  # [B, C, T]
+        x2 = x.clone()
+        torch_ln = torch.nn.LayerNorm(256, eps=1e-5)
+        # 256 is at 3rd index, but norm dim provided is [None, 1]. 1 here refers to 2nd dim,
+        # so normalization scores are incompatible with torch.nn.LayerNorm
+        broadcast_ln = normalization.BroadcastLayerNorm(256, dim=[None, 1], eps=1e-5)
+
+        # output of pytorch layer norm
+        orig_ln = torch_ln(x)
+
+        # output of broadcast layer norm
+        brod_ln = broadcast_ln(x2)
+
+        assert orig_ln.shape == brod_ln.shape
+
+        diff = orig_ln - brod_ln
+        assert torch.abs(diff).mean() > 1e-3
+        assert torch.square(diff).mean() > 1e-5
