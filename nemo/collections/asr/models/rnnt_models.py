@@ -140,6 +140,18 @@ class EncDecRNNTModel(ASRModel):
         else:
             self._optim_normalize_joint = False
             self._optim_normalize_txu = None
+            
+        # Setup normalized joint norm for model
+        if 'normalize_joint_norm' in self.cfg:
+            self._optim_normalize_joint_norm = self.cfg.normalize_joint_norm
+        else:
+            self._optim_normalize_joint_norm = False
+
+        # Setup normalized encoder norm for model
+        if 'normalize_encoder_norm' in self.cfg:
+            self._optim_normalize_encoder_norm = self.cfg.normalize_encoder_norm
+        else:
+            self._optim_normalize_encoder_norm = False
 
     @torch.no_grad()
     def transcribe(
@@ -661,3 +673,28 @@ class EncDecRNNTModel(ASRModel):
                 for param_name, param in self.decoder.named_parameters():
                     if param.grad is not None:
                         param.grad.data.div_(T)
+                        
+        if self._optim_normalize_joint_norm:
+            encoder_norm = 0
+            decoder_norm = 0
+            for param_name, param in self.encoder.named_parameters():
+                if param.grad is not None:
+                    encoder_norm += param.grad.data.norm()
+
+            for param_name, param in self.decoder.named_parameters():
+                if param.grad is not None:
+                    decoder_norm += param.grad.data.norm()
+
+            for param_name, param in self.encoder.named_parameters():
+                if param.grad is not None:
+                    param.grad.data.div_(decoder_norm)
+
+            for param_name, param in self.decoder.named_parameters():
+                if param.grad is not None:
+                    param.grad.data.div_(encoder_norm)
+
+        if self._optim_normalize_encoder_norm:
+            for param_name, param in self.encoder.named_parameters():
+                if param.grad is not None:
+                    norm = param.grad.norm()
+                    param.grad.data.div_(norm)
