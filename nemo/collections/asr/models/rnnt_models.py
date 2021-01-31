@@ -654,7 +654,6 @@ class EncDecRNNTModel(ASRModel):
         if self._optim_normalize_joint:
             T, U = self._optim_normalize_txu
             if T is not None and U is not None:
-                logging.info(f"Normalizing gradient by {T}x{U}")
                 for param_name, param in self.encoder.named_parameters():
                     if param.grad is not None:
                         param.grad.data.div_(U)
