@@ -52,12 +52,12 @@ RUN git clone --branch v0.8.1 https://github.com/pytorch/text.git && \
     cd .. && rm -r text
 
 #install TRT tools: PT quantization support and ONNX graph optimizer
-WORKDIR /tmp/trt_build
-RUN git clone https://github.com/NVIDIA/TensorRT.git && \
-    cd TensorRT/tools/onnx-graphsurgeon && python setup.py install && \
-    cd ../pytorch-quantization && \
-    python setup.py install && \
-    rm -fr  /tmp/trt_build
+#WORKDIR /tmp/trt_build
+#RUN git clone https://github.com/NVIDIA/TensorRT.git && \
+#    cd TensorRT/tools/onnx-graphsurgeon && python setup.py install && \
+#    cd ../pytorch-quantization && \
+#    python setup.py install && \
+#    rm -fr  /tmp/trt_build
 
 # install nemo dependencies
 WORKDIR /tmp/nemo
