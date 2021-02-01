@@ -76,12 +76,12 @@ COPY requirements .
 RUN for f in $(ls requirements/*.txt); do pip install --disable-pip-version-check --no-cache-dir -r $f; done
 
 #install TRT tools: PT quantization support and ONNX graph optimizer
-WORKDIR /tmp/trt_build
-RUN git clone https://github.com/NVIDIA/TensorRT.git && \
-    cd TensorRT/tools/onnx-graphsurgeon && python setup.py install && \
-    cd ../pytorch-quantization && \
-    python setup.py install && \
-    rm -fr  /tmp/trt_build
+#WORKDIR /tmp/trt_build
+#RUN git clone https://github.com/NVIDIA/TensorRT.git && \
+#    cd TensorRT/tools/onnx-graphsurgeon && python setup.py install && \
+#    cd ../pytorch-quantization && \
+#    python setup.py install && \
+#    rm -fr  /tmp/trt_build
 
 # copy nemo source into a scratch image
 FROM scratch as nemo-src
