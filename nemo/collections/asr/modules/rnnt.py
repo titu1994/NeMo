@@ -141,6 +141,8 @@ class RNNTDecoder(rnnt_abstract.AbstractRNNTDecoder):
             forget_gate_bias=forget_gate_bias,
             t_max=t_max,
             norm=normalization_mode,
+            weights_init_scale=weights_init_scale,
+            hidden_hidden_bias_scale=hidden_hidden_bias_scale,
             dropout=dropout,
         )
 
