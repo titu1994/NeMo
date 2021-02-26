@@ -78,8 +78,15 @@ class ESNCell(torch.nn.Module):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = torch.nn.Parameter(torch.randn(hidden_size, input_size), requires_grad=False)
-        self.weight_hh = torch.nn.Parameter(torch.randn(hidden_size, hidden_size), requires_grad=False)
+        self.sparsity = sparsity
+
+        self.weight_ih = torch.nn.Linear(input_size, hidden_size, bias=False)
+        self.weight_hh = torch.nn.Linear(hidden_size, hidden_size, bias=False)
+        self.readout = torch.nn.Linear(hidden_size, hidden_size, bias=False)
+
+        # Make reservoir weights untrainable
+        self.weight_ih.requires_grad_(False)
+        self.weight_hh.requires_grad_(False)
 
         # Float scaling factors (initalized to 1)
         self.rho = torch.nn.Parameter(torch.tensor(1.0))
@@ -94,18 +101,25 @@ class ESNCell(torch.nn.Module):
 
     def reset_parameters(self):
         stdv = 1.0  # / math.sqrt(self.hidden_size)
-        for weight in self.parameters():
+        for name, weight in self.named_parameters():
             torch.nn.init.uniform_(weight, -stdv, stdv)
+
+            if weight.ndim > 1 and 'readout' not in name:  # apply sparsity only to weight matrices, not scalars
+                mask = torch.rand(*weight.shape, device=weight.device, dtype=weight.dtype, requires_grad=False)
+                mask = mask <= self.sparsity
+                weight.data = weight.data.masked_fill(mask, value=0.0)
 
     def forward(self, input: torch.Tensor, state: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
         hx = state[0]
-        igates = self.gamma * (torch.mm(input, self.weight_ih.t()))
-        hgates = self.rho * (torch.mm(hx, self.weight_hh.t()))
+        igates = self.gamma * self.weight_ih(input)
+        hgates = self.rho * self.weight_hh(hx)
         gates = igates + hgates
 
         hy = self.activation(gates)
 
-        return hy, (hy,)
+        readout = self.readout(hy)
+
+        return readout, (readout,)
 
 
 def init_stacked_lstm(
