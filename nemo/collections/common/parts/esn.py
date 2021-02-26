@@ -90,7 +90,7 @@ class ESNCell(torch.nn.Module):
 
         # Float scaling factors (initalized to 1)
         self.gamma = torch.nn.Parameter(torch.tensor(1.0))
-        self.rho = torch.nn.Parameter(torch.tensor(1.0))
+        self.rho = torch.nn.Parameter(torch.tensor(0.99))
 
         if activation == 'tanh':
             self.activation = torch.nn.Tanh()
@@ -110,10 +110,16 @@ class ESNCell(torch.nn.Module):
             elif 'gamma' in name:
                 torch.nn.init.ones_(weight)
             elif 'rho' in name:
-                torch.nn.init.ones_(weight)
+                torch.nn.init.constant_(weight, 0.99)
             else:
                 stdv = 1.0  # / math.sqrt(self.hidden_size)
                 torch.nn.init.uniform_(weight, -stdv, stdv)
+
+        # compute hidden to hidden matrix spectral norm and scale weights
+        eigen_values, _ = torch.eig(self.weight_hh.weight, eigenvectors=False)
+        lambda_eig = eigen_values.abs().max()  # maximum real valued eigenvalue
+        if lambda_eig > 0.0:
+            self.weight_hh.weight.data = self.weight_hh.weight.data / lambda_eig
 
         # apply sparsity only to hidden_hh
         mask = torch.rand(
@@ -126,7 +132,7 @@ class ESNCell(torch.nn.Module):
     def forward(self, input: torch.Tensor, state: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
         hx = state[0]
         igates = self.gamma * self.weight_ih(input)
-        hgates = self.rho * self.weight_hh(hx)
+        hgates = torch.clamp_max(self.rho, 1.0) * self.weight_hh(hx)
         gates = igates + hgates
 
         hy = self.activation(gates)
@@ -134,7 +140,7 @@ class ESNCell(torch.nn.Module):
         readout = self.readout(hy)
         # readout = self.activation(readout)
 
-        return readout, (readout,)
+        return readout, (hy,)
 
 
 def init_stacked_lstm(
