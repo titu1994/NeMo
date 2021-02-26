@@ -89,25 +89,39 @@ class ESNCell(torch.nn.Module):
         self.weight_hh.requires_grad_(False)
 
         # Float scaling factors (initalized to 1)
-        self.rho = torch.nn.Parameter(torch.tensor(1.0))
         self.gamma = torch.nn.Parameter(torch.tensor(1.0))
+        self.rho = torch.nn.Parameter(torch.tensor(1.0))
 
         if activation == 'tanh':
             self.activation = torch.nn.Tanh()
         elif activation == 'relu':
             self.activation = torch.nn.ReLU(inplace=True)
+        self.act_str = activation
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1.0  # / math.sqrt(self.hidden_size)
+        # stdv = 1.0  / math.sqrt(self.hidden_size)
         for name, weight in self.named_parameters():
-            torch.nn.init.uniform_(weight, -stdv, stdv)
+            if 'readout' in name:
+                # stdv = 1.0 / math.sqrt(self.hidden_size)
+                # torch.nn.init.uniform_(weight, -stdv, stdv)
+                torch.nn.init.kaiming_normal_(weight, a=math.sqrt(5.0))
+            elif 'gamma' in name:
+                torch.nn.init.ones_(weight)
+            elif 'rho' in name:
+                torch.nn.init.ones_(weight)
+            else:
+                stdv = 1.0  # / math.sqrt(self.hidden_size)
+                torch.nn.init.uniform_(weight, -stdv, stdv)
 
-            if weight.ndim > 1 and 'readout' not in name:  # apply sparsity only to weight matrices, not scalars
-                mask = torch.rand(*weight.shape, device=weight.device, dtype=weight.dtype, requires_grad=False)
-                mask = mask <= self.sparsity
-                weight.data = weight.data.masked_fill(mask, value=0.0)
+        # apply sparsity only to hidden_hh
+        mask = torch.rand(
+            *self.weight_hh.weight.shape, device=self.weight_hh.weight.device, dtype=self.weight_hh.weight.dtype, requires_grad=False
+        )
+        mask = mask <= self.sparsity
+        self.weight_hh.weight.data = self.weight_hh.weight.data.masked_fill(mask, value=0.0)
+        del mask
 
     def forward(self, input: torch.Tensor, state: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
         hx = state[0]
@@ -118,6 +132,7 @@ class ESNCell(torch.nn.Module):
         hy = self.activation(gates)
 
         readout = self.readout(hy)
+        # readout = self.activation(readout)
 
         return readout, (readout,)
 
