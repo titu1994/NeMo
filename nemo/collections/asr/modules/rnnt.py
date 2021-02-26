@@ -1095,7 +1095,8 @@ class RNNTEchoStateNetworkDecoder(rnnt_abstract.AbstractRNNTDecoder):
     ):
         # Required arguments
         self.pred_hidden = esn['pred_hidden']
-        self.pred_rnn_layers = esn["pred_rnn_layers"]
+        self.pred_rnn_layers = esn['pred_rnn_layers']
+        self.sparsity = esn['sparsity']
         self.blank_idx = vocab_size
 
         # Initialize the model (blank token increases vocab size by 1)
@@ -1108,7 +1109,8 @@ class RNNTEchoStateNetworkDecoder(rnnt_abstract.AbstractRNNTDecoder):
             vocab_size=vocab_size,  # add 1 for blank symbol
             pred_n_hidden=self.pred_hidden,
             pred_rnn_layers=self.pred_rnn_layers,
-            esn_activation=self.activation
+            esn_sparsity=self.sparsity,
+            esn_activation=self.activation,
         )
 
     @typecheck()
@@ -1210,6 +1212,7 @@ class RNNTEchoStateNetworkDecoder(rnnt_abstract.AbstractRNNTDecoder):
         g = g.transpose(0, 1)  # (B, U + 1, H)
 
         del y, start, state
+        # del state_layers, num_states
         return g, hid
 
     def _predict(
@@ -1217,6 +1220,7 @@ class RNNTEchoStateNetworkDecoder(rnnt_abstract.AbstractRNNTDecoder):
         vocab_size,
         pred_n_hidden,
         pred_rnn_layers,
+        esn_sparsity,
         esn_activation,
     ):
         """
@@ -1243,6 +1247,7 @@ class RNNTEchoStateNetworkDecoder(rnnt_abstract.AbstractRNNTDecoder):
                     input_size=pred_n_hidden,
                     hidden_size=pred_n_hidden,
                     num_layers=pred_rnn_layers,
+                    sparsity=esn_sparsity,
                     activation=esn_activation,
                 ),
             }

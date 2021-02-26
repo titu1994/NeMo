@@ -20,12 +20,7 @@ import numpy as np
 import torch
 
 
-def esn(
-    input_size: int,
-    hidden_size: int,
-    num_layers: int,
-    activation: str,
-) -> torch.nn.Module:
+def esn(input_size: int, hidden_size: int, num_layers: int, sparsity: float, activation: str,) -> torch.nn.Module:
     """
     Utility function to provide unified interface to common LSTM RNN modules.
 
@@ -43,17 +38,13 @@ def esn(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
+            sparsity=sparsity,
             activation=activation,
         )
     )
 
 
-def esn_rnn(
-    input_size: int,
-    hidden_size: int,
-    num_layers: int,
-    activation: str,
-) -> torch.nn.Module:
+def esn_rnn(input_size: int, hidden_size: int, num_layers: int, sparsity: float, activation: str,) -> torch.nn.Module:
     """Returns a ScriptModule that mimics a PyTorch native LSTM."""
     # The following are not implemented.
     valid_activations = ['tanh', 'relu']
@@ -63,8 +54,8 @@ def esn_rnn(
     return StackedRNN(
         num_layers,
         ESNLayer,
-        first_layer_args=[ESNCell, input_size, hidden_size, activation],
-        other_layer_args=[ESNCell, hidden_size, hidden_size, activation],
+        first_layer_args=[ESNCell, input_size, hidden_size, sparsity, activation],
+        other_layer_args=[ESNCell, hidden_size, hidden_size, sparsity, activation],
     )
 
 
@@ -73,9 +64,7 @@ class ESNLayer(torch.nn.Module):
         super(ESNLayer, self).__init__()
         self.cell = cell(*cell_args)
 
-    def forward(
-        self, input: torch.Tensor, state: Tuple[torch.Tensor]
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
+    def forward(self, input: torch.Tensor, state: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
         inputs = input.unbind(0)
         outputs = []
         for i in range(len(inputs)):
@@ -85,12 +74,12 @@ class ESNLayer(torch.nn.Module):
 
 
 class ESNCell(torch.nn.Module):
-    def __init__(self, input_size, hidden_size, activation):
+    def __init__(self, input_size, hidden_size, sparsity, activation):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = torch.nn.Parameter(torch.randn(hidden_size, input_size))
-        self.weight_hh = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.weight_ih = torch.nn.Parameter(torch.randn(hidden_size, input_size), requires_grad=False)
+        self.weight_hh = torch.nn.Parameter(torch.randn(hidden_size, hidden_size), requires_grad=False)
 
         # Float scaling factors (initalized to 1)
         self.rho = torch.nn.Parameter(torch.tensor(1.0))
@@ -108,9 +97,7 @@ class ESNCell(torch.nn.Module):
         for weight in self.parameters():
             torch.nn.init.uniform_(weight, -stdv, stdv)
 
-    def forward(
-        self, input: torch.Tensor, state: Tuple[torch.Tensor, torch.Tensor]
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
+    def forward(self, input: torch.Tensor, state: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
         hx = state[0]
         igates = self.gamma * (torch.mm(input, self.weight_ih.t()))
         hgates = self.rho * (torch.mm(hx, self.weight_hh.t()))
@@ -134,28 +121,35 @@ class StackedRNN(torch.nn.Module):
         self.layers: torch.nn.ModuleList = init_stacked_lstm(num_layers, layer, first_layer_args, other_layer_args)
 
     def forward(
-        self, input: torch.Tensor, states: Optional[List[Tuple[torch.Tensor, torch.Tensor]]]
-    ) -> Tuple[torch.Tensor, List[Tuple[torch.Tensor]]]:
+        self, input: torch.Tensor, states: Optional[Tuple[torch.Tensor]]
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor]]:
+
+        num_layers: int = len(self.layers)
+
         if states is None:
-            temp_states: List[Tuple[torch.Tensor]] = []
             batch = input.size(1)
-            for layer in self.layers:
-                temp_states.append(
-                    (
-                        torch.zeros(batch, layer.cell.hidden_size, dtype=input.dtype, device=input.device),
-                    )
-                )
+            temp_states: Tuple[torch.Tensor] = (
+                torch.zeros(
+                    num_layers, batch, self.layers[0].cell.hidden_size, dtype=input.dtype, device=input.device
+                ),
+            )
 
             states = temp_states
 
-        output_states: List[Tuple[torch.Tensor]] = []
+        num_states: int = len(states)
+        output_states: List[torch.Tensor] = []
         output = input
         for i, rnn_layer in enumerate(self.layers):
-            state = states[i]
+            # HARDCODE STATE TUPLE => 1 WRAP
+            state: Tuple[torch.Tensor] = (states[0][i],)
             output, out_state = rnn_layer(output, state)
-            output_states.append(out_state)
-            i += 1
-        return output, output_states
+            # HARDCODE STATE TUPLE => 1 UNWRAP
+            output_states.append(out_state[0])
+            # i += 1
+        # HARDCODE STATE TUPLE => 1 WRAP
+        output_tensor: Tuple[torch.Tensor] = (torch.stack(output_states),)
+        del output_states
+        return output, output_tensor
 
 
 def label_collate(labels, device=None):
