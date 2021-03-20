@@ -2,7 +2,7 @@
 # Default learning parameters in this config are set for effective batch size of 1k on 32 GPUs.
 # To train it with smaller batch sizes, you may need to re-tune the learning parameters or use higher accumulate_grad_batches.
 
-name: &name "CitriNet-384-8x-Stride-Reduced-Kernel-v4"
+name: &name "CitriNet-384-8x-Stride-Reduced-RF-v4"
 
 # kernel: \[([0-9]+)\]
 # filters: ([0-9]+)
@@ -187,17 +187,6 @@ model:
 
       - filters: 384
         repeat: ${model.model_defaults.repeat}
-        kernel: [19]
-        stride: [1]
-        dilation: [1]
-        dropout: ${model.model_defaults.dropout}
-        residual: true
-        separable: ${model.model_defaults.separable}
-        se: ${model.model_defaults.se}
-        se_context_size: ${model.model_defaults.se_context_size}
-
-      - filters: 384
-        repeat: ${model.model_defaults.repeat}
         kernel: [15]
         stride: [1]
         dilation: [1]
@@ -221,6 +210,17 @@ model:
       - filters: 384
         repeat: ${model.model_defaults.repeat}
         kernel: [17]
+        stride: [1]
+        dilation: [1]
+        dropout: ${model.model_defaults.dropout}
+        residual: true
+        separable: ${model.model_defaults.separable}
+        se: ${model.model_defaults.se}
+        se_context_size: ${model.model_defaults.se_context_size}
+
+      - filters: 384
+        repeat: ${model.model_defaults.repeat}
+        kernel: [19]
         stride: [1]
         dilation: [1]
         dropout: ${model.model_defaults.dropout}
