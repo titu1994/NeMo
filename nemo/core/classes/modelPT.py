@@ -365,6 +365,7 @@ class ModelPT(LightningModule, Model):
         map_location: Optional[torch.device] = None,
         strict: bool = True,
         return_config: bool = False,
+        trainer: Optional[Trainer] = None,
     ):
         """
         Restores model instance (weights and configuration) into .nemo file
@@ -377,6 +378,8 @@ class ModelPT(LightningModule, Model):
             strict: Passed to load_state_dict. By default True
             return_config: If set to true, will return just the underlying config of the restored
                 model as an OmegaConf DictConfig object without instantiating the model.
+            trainer: Optional, a pytorch lightning Trainer object that will be forwarded to the
+                instantiated model's constructor.
 
             Example:
                 ```
@@ -398,6 +401,8 @@ class ModelPT(LightningModule, Model):
                 map_location = torch.device('cpu')
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            original_restore_state = cls._is_model_being_restored()
+
             try:
                 cls._set_model_restore_state(is_being_restored=True, folder=tmpdir)
                 cls._unpack_nemo_file(path2file=restore_path, out_folder=tmpdir)
@@ -431,13 +436,13 @@ class ModelPT(LightningModule, Model):
                         model_weights = path.join(tmpdir, _MODEL_WEIGHTS)
                     OmegaConf.set_struct(conf, True)
                     os.chdir(cwd)
-                    instance = cls.from_config_dict(config=conf)
+                    instance = cls.from_config_dict(config=conf, trainer=trainer)
                     instance = instance.to(map_location)
                     instance.load_state_dict(torch.load(model_weights, map_location=map_location), strict=strict)
 
                     logging.info(f'Model {instance.__class__.__name__} was successfully restored from {restore_path}.')
             finally:
-                cls._set_model_restore_state(is_being_restored=False)
+                cls._set_model_restore_state(is_being_restored=original_restore_state)
                 os.chdir(cwd)
 
         return instance
@@ -450,6 +455,7 @@ class ModelPT(LightningModule, Model):
         map_location: Optional[torch.device] = None,
         strict: bool = True,
         return_config: bool = False,
+        trainer: Optional[Trainer] = None,
     ):
         """
         Restores model instance (weights and configuration) from .nemo file.
@@ -463,6 +469,8 @@ class ModelPT(LightningModule, Model):
             strict: Passed to load_state_dict. By default True.
             return_config: If set to true, will return just the underlying config of the restored
                 model as an OmegaConf DictConfig object without instantiating the model.
+            trainer: Optional, a pytorch lightning Trainer object that will be forwarded to the
+                instantiated model's constructor.
 
             Example:
                 ```
