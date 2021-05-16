@@ -246,20 +246,9 @@ class CosineAnnealing(WarmupPolicy):
 
 class NoamAnnealing(_LRScheduler):
     def __init__(
-        self,
-        optimizer,
-        *,
-        d_model,
-        decay=0.5,
-        warmup_steps=None,
-        warmup_ratio=None,
-        max_steps=None,
-        min_lr=0.0,
-        last_epoch=-1,
+        self, optimizer, *, d_model, warmup_steps=None, warmup_ratio=None, max_steps=None, min_lr=0.0, last_epoch=-1
     ):
         self._normalize = d_model ** (-0.5)
-        self._decay = decay
-
         assert not (
             warmup_steps is not None and warmup_ratio is not None
         ), "Either use particular number of step or ratio"
@@ -299,7 +288,7 @@ class NoamAnnealing(_LRScheduler):
         return new_lrs
 
     def _noam_annealing(self, initial_lr, step):
-        mult = self._normalize * min(step ** (-self._decay), step * (self.warmup_steps ** (-(1.0 + self._decay))))
+        mult = self._normalize * min(step ** (-0.5), step * (self.warmup_steps ** (-1.5)))
         out_lr = initial_lr * mult
         if step > self.warmup_steps:
             out_lr = max(out_lr, self.min_lr)
