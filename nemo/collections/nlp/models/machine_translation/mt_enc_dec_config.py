@@ -100,6 +100,8 @@ class MTEncDecModelConfig(EncDecNLPModelConfig):
     )
     optim: Optional[OptimConfig] = MTOptimConfig()
 
+    # distillation: Optional[DistillationConfig] = DistillationConfig()
+
 
 @dataclass
 class AAYNBaseConfig(MTEncDecModelConfig):
