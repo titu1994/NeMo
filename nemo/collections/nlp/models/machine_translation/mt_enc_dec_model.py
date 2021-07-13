@@ -218,6 +218,7 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
         # Hinton Distillation
         if self.is_being_distilled():
             temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0))
+            # TODO: normalize grads
             self.distillation_registration_step(log_prob=temp_log_probs)
             del temp_log_probs
 
