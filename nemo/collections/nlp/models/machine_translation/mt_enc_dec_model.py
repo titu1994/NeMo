@@ -206,6 +206,9 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
 
     @typecheck()
     def forward(self, src, src_mask, tgt, tgt_mask):
+        # if not self.is_student_model():
+        #     print(f'TEACHER TOKENIZER {self.cfg.encoder_tokenizer}')
+
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
         tgt_hiddens = self.decoder(
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
@@ -214,9 +217,8 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
 
         # Hinton Distillation
         if self.is_being_distilled():
-            temp_hiddens = torch.div(tgt_hiddens, self.distill_cfg.get('temperature', 1.0))
-            temp_log_probs = self.log_softmax(hidden_states=temp_hiddens)
-            self.distillation_registration_step(temp_log_probs)
+            temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0))
+            self.distillation_registration_step(log_prob=temp_log_probs)
             del temp_log_probs
 
         return log_probs
@@ -244,6 +246,9 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
                 'train_loss': train_loss,
                 'lr': self._optimizer.param_groups[0]['lr'],
             }
+            return {'loss': train_loss, 'log': tensorboard_logs}
+        else:
+            return {'loss': train_loss}
 
         # # Distillation support
         # if self.is_being_distilled():
@@ -257,10 +262,8 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
         #     # No need for further steps, return immediately since later elements are not available on
         #     # both the student and the teacher models
 
-        if self._optimizer:
-            return {'loss': train_loss, 'log': tensorboard_logs}
-        else:
-            return {'loss': train_loss}
+        # if self.is_being_distilled():
+        #     self.distillation_registration_step(log_prob=log_probs)
 
     def eval_step(self, batch, batch_idx, mode, dataloader_idx=0):
         for i in range(len(batch)):
@@ -517,7 +520,7 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
                         shuffle_n=cfg.get("tar_shuffle_n", 100),
                         shard_strategy=cfg.get("shard_strategy", "scatter"),
                         global_rank=self.global_rank,
-                        world_size=self.world_size,
+                        world_size=max(1, self.world_size),
                         reverse_lang_direction=cfg.get("reverse_lang_direction", False),
                         prepend_id=self.multilingual_ids[idx],
                     )
