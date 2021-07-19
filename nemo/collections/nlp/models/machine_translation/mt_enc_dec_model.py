@@ -214,8 +214,6 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
 
     @typecheck()
     def forward(self, src, src_mask, tgt, tgt_mask):
-        # if not self.is_student_model():
-        #     print(f'TEACHER TOKENIZER {self.cfg.encoder_tokenizer}')
 
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
         tgt_hiddens = self.decoder(
@@ -225,8 +223,7 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
 
         # Hinton Distillation
         if self.is_being_distilled():
-            temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0))
-            # TODO: normalize grads
+            temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
             self.distillation_registration_step(log_prob=temp_log_probs)
             del temp_log_probs
 
@@ -247,9 +244,6 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
         log_probs = self(src_ids, src_mask, tgt_ids, tgt_mask)
         train_loss = self.loss_fn(log_probs=log_probs, labels=labels)
 
-        # print(f'optimizer {self.param_groups}')
-        # print(f'learning rate {self.param_groups[0]["lr"]}')
-
         if self._optimizer:
             tensorboard_logs = {
                 'train_loss': train_loss,
@@ -258,21 +252,6 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
             return {'loss': train_loss, 'log': tensorboard_logs}
         else:
             return {'loss': train_loss}
-
-        # # Distillation support
-        # if self.is_being_distilled():
-        #     if self.is_student_model():
-        #         loss_key = 'input'
-        #     else:
-        #         loss_key = 'target'
-
-        #     # Register the tensor for the loss function
-        #     self.register_distillation_tensor(loss_key=loss_key, tensor=log_probs)
-        #     # No need for further steps, return immediately since later elements are not available on
-        #     # both the student and the teacher models
-
-        # if self.is_being_distilled():
-        #     self.distillation_registration_step(log_prob=log_probs)
 
     def eval_step(self, batch, batch_idx, mode, dataloader_idx=0):
         for i in range(len(batch)):
