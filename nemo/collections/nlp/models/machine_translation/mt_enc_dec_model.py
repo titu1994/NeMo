@@ -219,15 +219,24 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
         tgt_hiddens = self.decoder(
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
         )
-        log_probs = self.log_softmax(hidden_states=tgt_hiddens)
 
-        # Hinton Distillation
         if self.is_being_distilled():
-            temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
-            self.distillation_registration_step(log_prob=temp_log_probs)
-            del temp_log_probs
+            temperature = self.distill_cfg.get('temperature', 1.0)
+            temp_logits = torch.nn.functional.log_softmax(tgt_hiddens / temperature)
+            self.distillation_registration_step(log_prob=temp_logits)
+            del temp_logits
 
-        return log_probs
+        return self.log_softmax(hidden_states=tgt_hiddens)
+
+        # log_probs = self.log_softmax(hidden_states=tgt_hiddens)
+
+        # # Hinton Distillation
+        # if self.is_being_distilled():
+        #     temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
+        #     self.distillation_registration_step(log_prob=temp_log_probs)
+        #     del temp_log_probs
+
+        # return log_probs
 
     def training_step(self, batch, batch_nb):
         """
