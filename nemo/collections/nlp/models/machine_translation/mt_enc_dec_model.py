@@ -220,9 +220,17 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
         )
 
+        import pdb; pdb.set_trace()
+
+        print(tgt_hiddens)
+
+        logits = self.log_softmax(hidden_states=tgt_hiddens, log_softmax=False)
+
+        print(tgt_hiddens)
+
         if self.is_being_distilled():
             temperature = self.distill_cfg.get('temperature', 1.0)
-            temp_logits = torch.nn.functional.log_softmax(tgt_hiddens / temperature)
+            temp_logits = torch.nn.functional.log_softmax(logits / temperature)
             self.distillation_registration_step(log_prob=temp_logits)
             del temp_logits
 
