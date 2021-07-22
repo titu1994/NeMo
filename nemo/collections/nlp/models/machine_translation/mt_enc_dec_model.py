@@ -175,6 +175,15 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
             use_transformer_init=cfg.head.use_transformer_init,
         )
 
+        # self.logits = TokenClassifier(
+        #     hidden_size=self.decoder.hidden_size,
+        #     num_classes=self.decoder_vocab_size,
+        #     activation=cfg.head.activation,
+        #     log_softmax=cfg.head.log_softmax,
+        #     dropout=cfg.head.dropout,
+        #     use_transformer_init=cfg.head.use_transformer_init,
+        # )
+
         self.beam_search = BeamSearchSequenceGenerator(
             embedding=self.decoder.embedding,
             decoder=self.decoder.decoder,
@@ -187,6 +196,14 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
             len_pen=cfg.len_pen,
             max_delta_length=cfg.max_generation_delta,
         )
+
+        # tie weights of log_softmax and logits for all layers
+        # print(self.log_softmax.mlp.layers)
+
+        # for i in range(self.log_softmax.mlp.layers):
+        #     # getattr(self.log_softmax.mlp, f'layer{i}') = torch.nn.Linear(1, 1)
+        #     layer = getattr(self.log_softmax.mlp, f'layer{i}')
+        #     setattr(self.logits.mlp, f'layer{i}', layer)
 
         # tie weights of embedding and softmax matrices
         self.log_softmax.mlp.layer0.weight = self.decoder.embedding.token_embedding.weight
@@ -212,39 +229,46 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
         ids[ids >= self.decoder_tokenizer.vocab_size] = self.decoder_tokenizer.unk_id
         return ids
 
+    # @typecheck()
+    # def forward(self, src, src_mask, tgt, tgt_mask):
+
+    #     src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
+    #     tgt_hiddens = self.decoder(
+    #         input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
+    #     )
+    #     log_probs = self.log_softmax(hidden_states=tgt_hiddens)
+
+    #     # Hinton Distillation
+    #     if self.is_being_distilled():
+    #         temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
+    #         self.distillation_registration_step(log_prob=temp_log_probs)
+    #         del temp_log_probs
+
+    #     return log_probs
+
+
     @typecheck()
     def forward(self, src, src_mask, tgt, tgt_mask):
-
+    
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
         tgt_hiddens = self.decoder(
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
         )
 
-        import pdb; pdb.set_trace()
-
-        print(tgt_hiddens)
-
-        logits = self.log_softmax(hidden_states=tgt_hiddens, log_softmax=False)
-
-        print(tgt_hiddens)
-
+        # Hinton distillation
         if self.is_being_distilled():
+            self.log_softmax.log_softmax = False
             temperature = self.distill_cfg.get('temperature', 1.0)
-            temp_logits = torch.nn.functional.log_softmax(logits / temperature)
-            self.distillation_registration_step(log_prob=temp_logits)
+            temp_logits = self.log_softmax(hidden_states=tgt_hiddens / temperature)
+
+            temp_log_probs = torch.log_softmax(temp_logits, dim=-1)
+            self.distillation_registration_step(log_prob=temp_log_probs)
+
             del temp_logits
+            self.log_softmax.log_softmax = True
 
-        return self.log_softmax(hidden_states=tgt_hiddens)
-
-        # log_probs = self.log_softmax(hidden_states=tgt_hiddens)
-
-        # # Hinton Distillation
-        # if self.is_being_distilled():
-        #     temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
-        #     self.distillation_registration_step(log_prob=temp_log_probs)
-        #     del temp_log_probs
-
-        # return log_probs
+        log_probs = self.log_softmax(hidden_states=tgt_hiddens)
+        return log_probs
 
     def training_step(self, batch, batch_nb):
         """
