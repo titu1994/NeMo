@@ -264,13 +264,7 @@ class MTEncDecModel(EncDecNLPModel, DistillationMixin):
             temp_logits = self.log_softmax(hidden_states=tgt_hiddens / temperature)
 
             temp_log_probs = torch.log_softmax(temp_logits, dim=-1)
-            # self.distillation_registration_step(log_prob=temp_log_probs)
-
-            if self.distill_cfg.get('distill_encoder', False):
-            # do out.cpu() if needed
-                self.register_distillation_tensor(tensor=temp_log_probs, loss_name='cosine')
-            else:
-                self.distillation_registration_step(log_prob=temp_log_probs)
+            self.distillation_registration_step(log_prob=temp_log_probs)
 
             del temp_logits
             self.log_softmax.log_softmax = True
