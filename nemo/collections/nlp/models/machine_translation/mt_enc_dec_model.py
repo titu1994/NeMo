@@ -47,13 +47,14 @@ from nemo.collections.nlp.modules.common.transformer import BeamSearchSequenceGe
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
 from nemo.utils import logging, model_utils
 from nemo.core.classes.mixins import DistillationMixin
+from nemo.collections.nlp.parts.mixins import MTEncDecDistillationMixin
 
 import copy
 
 __all__ = ['MTEncDecModel']
 
 
-class MTEncDecModel(EncDecNLPModel, DistillationMixin):
+class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
     """
     Encoder-decoder machine translation model.
     """
