@@ -262,9 +262,11 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         if self.is_being_distilled():
             self.log_softmax.log_softmax = False
             temperature = self.distill_cfg.get('temperature', 1.0)
-            temp_logits = self.log_softmax(hidden_states=tgt_hiddens / temperature)
+            logits = self.log_softmax(hidden_states=tgt_hiddens)
+            temp_logits = logits / temperature
 
             temp_log_probs = torch.log_softmax(temp_logits, dim=-1)
+
             self.distillation_registration_step(log_prob=temp_log_probs)
 
             del temp_logits
