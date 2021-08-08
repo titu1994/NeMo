@@ -15,7 +15,7 @@
 import itertools
 import json
 import random
-from multiprocessing import Value
+from multiprocessing import Value, log_to_stderr
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -23,6 +23,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.utils.data as pt_data
+import torch.nn.functional as F
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.utilities import rank_zero_only
@@ -251,28 +252,41 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
 
 
     @typecheck()
-    def forward(self, src, src_mask, tgt, tgt_mask):
-    
+    def forward(self, src, src_mask, tgt, tgt_mask):    
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
         tgt_hiddens = self.decoder(
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
         )
 
-        # Hinton distillation
+        # Hinton distillation (either teacher/student)
         if self.is_being_distilled():
             self.log_softmax.log_softmax = False
             temperature = self.distill_cfg.get('temperature', 1.0)
             logits = self.log_softmax(hidden_states=tgt_hiddens)
             temp_logits = logits / temperature
 
-            temp_log_probs = torch.log_softmax(temp_logits, dim=-1)
+            temp_log_probs = F.log_softmax(temp_logits, dim=-1)
+
+            print('Temp log probs')
+            print(temp_log_probs.shape)
 
             self.distillation_registration_step(log_prob=temp_log_probs)
+            del temp_log_probs
 
-            del temp_logits
+            # If student, we use log-probabilities
+            # if self.is_student_model():
+            #     temp_log_probs = F.log_softmax(temp_logits, dim=-1)
+            #     self.distillation_registration_step(log_prob=temp_log_probs)
+            #     del temp_log_probs
+            # else:
+            #     temp_probs = F.softmax(temp_logits, dim=-1)
+            #     self.distillation_registration_step(log_prob=temp_probs)
+            #     del temp_probs
+
             self.log_softmax.log_softmax = True
 
         log_probs = self.log_softmax(hidden_states=tgt_hiddens)
+
         return log_probs
 
     def distilbert_initialization(self, other_model: 'MTEncDecModel'):
@@ -293,8 +307,8 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         print(decoder_step_size)
 
         # Reduce layers by factor of n_factor and instantiate new student encoder/decoder layers from teacher
-        self.encoder._encoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_encoder_layers[i]) for i in range(0, num_student_encoder_layers, encoder_step_size)])
-        self.decoder._decoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_decoder_layers[i]) for i in range(0, num_student_decoder_layers, decoder_step_size)])
+        self.encoder._encoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_encoder_layers[i]) for i in range(0, num_teacher_encoder_layers, encoder_step_size)])
+        self.decoder._decoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_decoder_layers[i]) for i in range(0, num_teacher_decoder_layers, decoder_step_size)])
 
         print('before')
         print(num_teacher_encoder_layers)
