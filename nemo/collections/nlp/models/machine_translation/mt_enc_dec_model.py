@@ -170,6 +170,10 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
             pre_ln_final_layer_norm=decoder_cfg_dict.get('pre_ln_final_layer_norm', False),
         )
 
+        # Student number of encoder and decoder layers
+        self.num_student_encoder_layers=encoder_cfg_dict.get('num_layers', 1)
+        self.num_student_decoder_layers=decoder_cfg_dict.get('num_layers', 1)
+
         self.log_softmax = TokenClassifier(
             hidden_size=self.decoder.hidden_size,
             num_classes=self.decoder_vocab_size,
@@ -294,8 +298,8 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         teacher_decoder_layers = other_model.decoder._decoder.layers
         num_teacher_decoder_layers = len(teacher_decoder_layers)
 
-        num_student_encoder_layers = 3
-        num_student_decoder_layers = 3
+        num_student_encoder_layers = self.num_student_encoder_layers
+        num_student_decoder_layers = self.num_student_decoder_layers
 
         encoder_step_size = num_teacher_encoder_layers // num_student_encoder_layers
         decoder_step_size = num_teacher_decoder_layers // num_student_decoder_layers
