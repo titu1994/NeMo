@@ -266,9 +266,11 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
             temp_logits = logits / temperature
 
             temp_log_probs = F.log_softmax(temp_logits, dim=-1)
+            self.xyz = temp_log_probs
+            # import pdb; pdb.set_trace()
 
-            print('Temp log probs')
-            print(temp_log_probs.shape)
+            # print('Temp log probs')
+            # print(temp_log_probs.shape)
 
             self.distillation_registration_step(log_prob=temp_log_probs)
             del temp_log_probs
