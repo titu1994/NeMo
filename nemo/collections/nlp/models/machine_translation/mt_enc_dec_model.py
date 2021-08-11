@@ -237,24 +237,6 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         ids[ids >= self.decoder_tokenizer.vocab_size] = self.decoder_tokenizer.unk_id
         return ids
 
-    # @typecheck()
-    # def forward(self, src, src_mask, tgt, tgt_mask):
-
-    #     src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
-    #     tgt_hiddens = self.decoder(
-    #         input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
-    #     )
-    #     log_probs = self.log_softmax(hidden_states=tgt_hiddens)
-
-    #     # Hinton Distillation
-    #     if self.is_being_distilled():
-    #         temp_log_probs = torch.nn.functional.log_softmax(tgt_hiddens / self.distill_cfg.get('temperature', 1.0), dim=-1)
-    #         self.distillation_registration_step(log_prob=temp_log_probs)
-    #         del temp_log_probs
-
-    #     return log_probs
-
-
     @typecheck()
     def forward(self, src, src_mask, tgt, tgt_mask):    
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
@@ -270,20 +252,9 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
             temp_logits = logits / temperature
 
             temp_log_probs = F.log_softmax(temp_logits, dim=-1)
-            # self.xyz = temp_log_probs
 
             self.distillation_registration_step(log_prob=temp_log_probs)
             del temp_log_probs
-
-            # If student, we use log-probabilities
-            # if self.is_student_model():
-            #     temp_log_probs = F.log_softmax(temp_logits, dim=-1)
-            #     self.distillation_registration_step(log_prob=temp_log_probs)
-            #     del temp_log_probs
-            # else:
-            #     temp_probs = F.softmax(temp_logits, dim=-1)
-            #     self.distillation_registration_step(log_prob=temp_probs)
-            #     del temp_probs
 
             self.log_softmax.log_softmax = True
 
@@ -319,27 +290,6 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         print('after')
         print(len(self.encoder._encoder.layers))
         print(len(self.decoder._decoder.layers))
-
-        # Check that layers are the same
-        # for i in range(len(self.encoder._encoder.layers)):
-        #     k = i * n_factor
-        #     delta_weight = self.encoder._encoder.layers[i].first_sub_layer.query_net.weight - teacher_encoder_layers[k].first_sub_layer.query_net.weight
-        #     print('Diff in encoder weights at layer ', i)
-        #     print(torch.sum(torch.sum(delta_weight, dim=1), dim=0))
-
-        #     delta_bias = self.encoder._encoder.layers[i].first_sub_layer.query_net.bias - teacher_encoder_layers[k].first_sub_layer.query_net.bias
-        #     print('Diff in encoder biases at layer ', i)
-        #     print(torch.sum(delta_bias, dim=0))
-
-        # for i in range(len(self.decoder._decoder.layers)):
-        #     k = i * n_factor
-        #     delta_weight = self.decoder._decoder.layers[i].first_sub_layer.query_net.weight - teacher_decoder_layers[k].first_sub_layer.query_net.weight
-        #     print('Diff in decoder weights at layer ', i)
-        #     print(torch.sum(torch.sum(delta_weight, dim=1), dim=0))
-
-        #     delta_bias = self.decoder._decoder.layers[i].first_sub_layer.query_net.bias - teacher_decoder_layers[k].first_sub_layer.query_net.bias
-        #     print('Diff in decoder biases at layer ', i)
-        #     print(torch.sum(delta_bias, dim=0))
 
 
     def training_step(self, batch, batch_nb):
