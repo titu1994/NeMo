@@ -281,7 +281,7 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
 
         # Reduce layers by factor of n_factor and instantiate new student encoder/decoder layers from teacher
         self.encoder._encoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_encoder_layers[i]) for i in range(0, num_teacher_encoder_layers, encoder_step_size)])
-        self.decoder._decoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_decoder_layers[i]) for i in range(0, num_teacher_decoder_layers, decoder_step_size)])
+        self.decoder._decoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_decoder_layers[i]) for i in range(num_teacher_decoder_layers - 1, -1, decoder_step_size)])
 
         print('before')
         print(num_teacher_encoder_layers)
