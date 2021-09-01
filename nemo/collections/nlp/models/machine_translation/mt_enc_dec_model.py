@@ -48,14 +48,14 @@ from nemo.collections.nlp.modules.common.transformer import BeamSearchSequenceGe
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
 from nemo.utils import logging, model_utils
 from nemo.core.classes.mixins import DistillationMixin
-from nemo.collections.nlp.parts.mixins import MTEncDecDistillationMixin
+from nemo.collections.nlp.parts.mixins import NMTDistillationMixin
 
 import copy
 
 __all__ = ['MTEncDecModel']
 
 
-class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
+class MTEncDecModel(EncDecNLPModel, NMTDistillationMixin):
     """
     Encoder-decoder machine translation model.
     """
@@ -108,7 +108,7 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
                 )
             elif isinstance(self.src_language, ListConfig):
                 for lng in self.src_language:
-                    self.multilingual_ids.append(self.encoder_tokenizer.token_to_id("<" + lng + ">"))
+                    self.multilingual_ids.append(None)
             elif isinstance(self.tgt_language, ListConfig):
                 for lng in self.tgt_language:
                     self.multilingual_ids.append(self.encoder_tokenizer.token_to_id("<" + lng + ">"))
@@ -237,8 +237,28 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         ids[ids >= self.decoder_tokenizer.vocab_size] = self.decoder_tokenizer.unk_id
         return ids
 
+    def test_encoder_ids(self, ids, raise_error=False):
+        invalid_ids = (ids >= self.encoder_tokenizer.vocab_size).any()
+
+        if raise_error and invalid_ids:
+            raise ValueError("Encoder ids are out of range (tip: check encoder tokenizer)")
+
+        return not invalid_ids
+
+    def test_decoder_ids(self, ids, raise_error=False):
+        invalid_ids = (ids >= self.decoder_tokenizer.vocab_size).any()
+
+        if raise_error and invalid_ids:
+            raise ValueError("Decoder ids are out of range (tip: check decoder tokenizer)")
+
+        return not invalid_ids
+
     @typecheck()
-    def forward(self, src, src_mask, tgt, tgt_mask):    
+    def forward(self, src, src_mask, tgt, tgt_mask):
+        # test src/tgt for id range (i.e., hellp in catching wrong tokenizer)
+        self.test_encoder_ids(src, raise_error=True)
+        self.test_decoder_ids(tgt, raise_error=True)
+
         src_hiddens = self.encoder(input_ids=src, encoder_mask=src_mask)
         tgt_hiddens = self.decoder(
             input_ids=tgt, decoder_mask=tgt_mask, encoder_embeddings=src_hiddens, encoder_mask=src_mask
@@ -275,22 +295,17 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
         encoder_step_size = num_teacher_encoder_layers // num_student_encoder_layers
         decoder_step_size = num_teacher_decoder_layers // num_student_decoder_layers
 
-        print('test')
-        print(encoder_step_size)
-        print(decoder_step_size)
+        print('DistilBERT initialization')
+        print('-------------------------')
+        print('Encoder step size: {}'.format(encoder_step_size))
+        print('Decoder step size: {}'.format(decoder_step_size))
 
         # Reduce layers by factor of n_factor and instantiate new student encoder/decoder layers from teacher
         self.encoder._encoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_encoder_layers[i]) for i in range(0, num_teacher_encoder_layers, encoder_step_size)])
         self.decoder._decoder.layers = torch.nn.ModuleList([copy.deepcopy(teacher_decoder_layers[num_teacher_decoder_layers - i - 1]) for i in range(0, num_teacher_decoder_layers, decoder_step_size)])
 
-        print('before')
-        print(num_teacher_encoder_layers)
-        print(num_teacher_decoder_layers)
-
-        print('after')
-        print(len(self.encoder._encoder.layers))
-        print(len(self.decoder._decoder.layers))
-
+        print('Number of student encoder layers: {}'.format(len(self.encoder._encoder.layers)))
+        print('Number of student decoder layers {}'.format(len(self.decoder._decoder.layers)))
 
     def training_step(self, batch, batch_nb):
         """
@@ -849,7 +864,11 @@ class MTEncDecModel(EncDecNLPModel, MTEncDecDistillationMixin):
                 raise ValueError("Expect source_lang and target_lang to infer for multilingual model.")
             src_symbol = self.encoder_tokenizer.token_to_id('<' + source_lang + '>')
             tgt_symbol = self.encoder_tokenizer.token_to_id('<' + target_lang + '>')
-            prepend_ids = [src_symbol if src_symbol in self.multilingual_ids else tgt_symbol]
+            if src_symbol in self.multilingual_ids:
+                prepend_ids = [src_symbol]
+            elif tgt_symbol in self.multilingual_ids:
+                prepend_ids = [tgt_symbol]
+
         try:
             self.eval()
             src, src_mask = self.prepare_inference_batch(text, prepend_ids)

@@ -24,8 +24,10 @@ __all__ = ['NMTScaledKLDivLoss']
 
 class NMTScaledKLDivLoss(nn.KLDivLoss, Serialization, Typing, ScaledDistillationLossMixin):
     """
-    Wrapper around the NMTKLDivLoss so that gradients of the loss function are scaled by temperature parameter (T^2).
+    Wrapper around the KLDivLoss so that gradients of the loss function are scaled by temperature parameter (T^2).
     Reference: Distilling the Knowledge in a Neural Network (https://arxiv.org/abs/1503.02531)
+
+
     """
 
     def __init__(
@@ -52,6 +54,8 @@ class NMTScaledKLDivLoss(nn.KLDivLoss, Serialization, Typing, ScaledDistillation
 
     @typecheck()
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # We compute the loss by first summing over the vocabulary V (NUM_CLASSES)
+        # and then taking the mean over BATCH_SIZE X SEQ_LENGTH
         return super().forward(input=input, target=target).sum(-1).mean()
 
     @property

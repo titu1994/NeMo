@@ -21,85 +21,10 @@ from nemo.core.classes.mixins import DistillationMixin
 from nemo.utils import logging
 
 
-class MTEncDecDistillationMixin(DistillationMixin):
+class NMTDistillationMixin(DistillationMixin):
     """
     Distillation Mixin specialization for EncDec based MT models.
     """
-
-    # def distillation_registration_step(self, decoder: DistillationMixin):
-    #     """
-    #     Helper method to register tensors inside of `training_step`.
-
-    #     Args:
-    #         decoder: A ConvASRDecoder decoder which implements DistillationMixin and registers
-    #             a `target` and `input` tensors during distillation.
-    #     """
-    #     if not isinstance(decoder, DistillationMixin):
-    #         raise RuntimeError(
-    #             f"Decoder {decoder.__class__.__name__}` does not implement DistillationMixin."
-    #             f"PLease extend it and return `target` and `input` tensors for KLDivergence loss."
-    #         )
-
-    #     # Extract the registry from the decoder, then flatten its `primary` loss dictionary.
-    #     # Flatten method always returns a list, even for single items, so remove the first element.
-    #     registry = decoder.get_distillation_module_registry(decoder)
-    #     registry = self.flatten_distillation_module_registry(registry, loss_name='primary')[0]
-
-    #     for loss_key, tensor in registry.items():
-    #         # Register the tensor for the loss function
-    #         self.register_distillation_tensor(loss_key=loss_key, tensor=tensor)
-
-    # def _validate_distillation_encoder_match(self, other_model: 'EncDecCTCModel'):
-    #     """
-    #     Utility method to check if asr model encoder is of certain type, and if so, try to perform encoder specific
-    #     distillation.
-
-    #     Args:
-    #         other_model: When `self` = student model, `other_model` = teacher model.
-    #             When `self` = teacher model, `other_model` = student model.
-    #     """
-    #     # Specialize for ConvASREncoder type encoder.
-    #     if 'ConvASREncoder' in self.cfg.encoder._target_ and 'ConvASREncoder' in other_model.cfg.encoder._target_:
-    #         self._distillation_encoder_match = 'ConvASREncoder'
-    #         logging.info(
-    #             "Teacher and student models have a ConvASREncoder module as their encoder !\n"
-    #             "Encoder distillation will be attempted if teacher-student models shapes are compatible."
-    #         )
-    #     else:
-    #         self._distillation_encoder_match = None
-    #         logging.info("Teacher and student models do not have compatible encoders.")
-
-    # def _validate_distillation_decoder_match(self, other_model: 'EncDecCTCModel'):
-    #     """
-    #     Utility method to check if asr model decoder is of certain type, and if so, try to perform decoder specific
-    #     distillation.
-
-    #     Args:
-    #         other_model: When `self` = student model, `other_model` = teacher model.
-    #             When `self` = teacher model, `other_model` = student model.
-    #     """
-    #     # Check if number of weight matrices of both student and teacher decoders is the same.
-    #     teacher_decoder_params = list(other_model.decoder.parameters())
-    #     student_decoder_params = list(self.decoder.parameters())
-
-    #     if len(teacher_decoder_params) == len(student_decoder_params) and 'cosine' in self.distill_cfg:
-    #         # If number of weight matrices is same, attempt to perform decoder weight matrix distillation
-    #         self._distillation_decoder_match = True
-
-    #         for tp, sp in zip(teacher_decoder_params, student_decoder_params):
-    #             if tp.data.shape != sp.data.shape:
-    #                 # Weight matrices mismatched, failed to perform decoder weight matrix distillation
-    #                 self._distillation_decoder_match = False
-    #                 break
-
-    #         logging.info(
-    #             "Decoder parameters match exactly between student and teacher models. Initializing "
-    #             "student decoder with teacher parameters."
-    #         )
-    #     else:
-    #         # Number of weight matrices are different, cannot perform weight matrix distillation
-    #         self._distillation_decoder_match = False
-    #         logging.info("Decoder parameters do not match exactly between student and teacher models")
 
     def prehook_additional_distillation_losses(
         self,
