@@ -183,15 +183,6 @@ class MTEncDecModel(EncDecNLPModel, NMTDistillationMixin):
             use_transformer_init=cfg.head.use_transformer_init,
         )
 
-        # self.logits = TokenClassifier(
-        #     hidden_size=self.decoder.hidden_size,
-        #     num_classes=self.decoder_vocab_size,
-        #     activation=cfg.head.activation,
-        #     log_softmax=cfg.head.log_softmax,
-        #     dropout=cfg.head.dropout,
-        #     use_transformer_init=cfg.head.use_transformer_init,
-        # )
-
         self.beam_search = BeamSearchSequenceGenerator(
             embedding=self.decoder.embedding,
             decoder=self.decoder.decoder,
@@ -204,14 +195,6 @@ class MTEncDecModel(EncDecNLPModel, NMTDistillationMixin):
             len_pen=cfg.len_pen,
             max_delta_length=cfg.max_generation_delta,
         )
-
-        # tie weights of log_softmax and logits for all layers
-        # print(self.log_softmax.mlp.layers)
-
-        # for i in range(self.log_softmax.mlp.layers):
-        #     # getattr(self.log_softmax.mlp, f'layer{i}') = torch.nn.Linear(1, 1)
-        #     layer = getattr(self.log_softmax.mlp, f'layer{i}')
-        #     setattr(self.logits.mlp, f'layer{i}', layer)
 
         # tie weights of embedding and softmax matrices
         self.log_softmax.mlp.layer0.weight = self.decoder.embedding.token_embedding.weight
