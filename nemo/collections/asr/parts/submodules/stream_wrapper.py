@@ -14,6 +14,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from enum import Enum
 
@@ -37,6 +38,34 @@ class StreamInferenceMode(Enum):
     # Model its in inference mode and it's topology is the same with training
     # mode (with removed droputs etc)
     NON_STREAM_INFERENCE = 'NON_STREAM_INFERENCE'
+
+
+def _is_conv_op(m):
+    if isinstance(
+        m,
+        (
+            nn.Conv1d,
+            nn.Conv2d,
+            # tf.keras.layers.AveragePooling2D)
+        ),
+    ):
+        return True
+    else:
+        return False
+
+
+def _is_pool_op(m):
+    if isinstance(m, (nn.AvgPool1d, nn.AvgPool2d)):
+        return True
+    else:
+        return False
+
+
+def _is_global_time_dim_op(m):
+    if isinstance(m, (nn.Flatten, nn.AdaptiveMaxPool1d, nn.AdaptiveAvgPool1d),):
+        return True
+    else:
+        return False
 
 
 class StreamWrapper(nn.Module):
@@ -92,7 +121,7 @@ class StreamWrapper(nn.Module):
     ):
         super().__init__()
 
-        self.inner_module = module
+        self.inner_module = module  # type: torch.nn.Module
         self.inference_batch_size = inference_batch_size
         self.mode = mode
         self.pad_time_dim = pad_time_dim
@@ -100,12 +129,11 @@ class StreamWrapper(nn.Module):
         self.ring_buffer_size_in_time_dim = ring_buffer_size_in_time_dim
         self.samplewise_inference = samplewise_inference
         self.stride = 1
+        self.built = False
 
         wrapped_module = module
 
-        if not samplewise_inference and isinstance(
-            wrapped_module, (nn.Flatten, nn.AdaptiveAvgPool1d, nn.AdaptiveMaxPool1d)
-        ):
+        if not samplewise_inference and _is_global_time_dim_op(wrapped_module):
             raise ValueError(
                 'Flatten, AdaptiveAvgPool1d, AdaptiveMaxPool1d '
                 'can be used only with samplewise_inference = True '
@@ -115,20 +143,40 @@ class StreamWrapper(nn.Module):
                 'so conv can be used with samplewise_inference = False or True'
             )
 
+        self._initialize_ring_buffer_size_in_time_dim(wrapped_module)
+
+    def forward(self, *inputs):
+        self._build_states(*inputs)
+
+        if self.mode == StreamInferenceMode.STREAM_INTERNAL_STATE_INFERENCE:
+            return self._streaming_internal_state(*inputs)
+
+        elif self.mode == StreamInferenceMode.STREAM_EXTERNAL_STATE_INFERENCE:
+            if self.ring_buffer_size_in_time_dim:
+                # in streaming inference mode with external state
+                # in addition to the output we return the output state.
+                output, self.output_state = self._streaming_external_state(*inputs, self.input_state)
+            else:
+                # if there is no ring buffer then the input_state isn't needed.
+                output = self.cell(*inputs)
+
+            return output
+
+        elif self.mode in (StreamInferenceMode.TRAINING, StreamInferenceMode.NON_STREAM_INFERENCE):
+            # run non streamable training or non streamable inference
+            return self._non_streaming(*inputs)
+
+        else:
+            raise ValueError(f'Encountered unexpected mode `{self.mode}`.')
+
+    def _initialize_ring_buffer_size_in_time_dim(self, wrapped_module):
         if self.ring_buffer_size_in_time_dim is not None:
             # it is a special case when ring_buffer_size_in_time_dim is specified
             # outside of the layer in this case we just build a ring buffer
             # and do not check what is the type of the cell
             pass
 
-        elif isinstance(
-            wrapped_module,
-            (
-                nn.Conv1d,
-                nn.Conv2d,
-                # average_pooling2d.AveragePooling2D),
-            ),
-        ):
+        elif _is_conv_op(wrapped_module):
             padding = wrapped_module.padding
             strides = wrapped_module.stride
             self.stride = strides[0]
@@ -162,7 +210,7 @@ class StreamWrapper(nn.Module):
                 # input samples.
                 self.ring_buffer_size_in_time_dim = max(0, dilation_rate[0] * (kernel_size[0] - 1) - (strides[0] - 1))
 
-        elif isinstance(wrapped_module, nn.AvgPool1d):
+        elif _is_pool_op(wrapped_module):
             strides = wrapped_module.stride
             kernel_size = wrapped_module.kernel_size
             self.stride = strides[0]
@@ -175,10 +223,7 @@ class StreamWrapper(nn.Module):
             # effective kernel size in time dimension
             self.ring_buffer_size_in_time_dim = kernel_size[0]
 
-        elif isinstance(
-            wrapped_module,
-            (nn.Flatten, nn.AdaptiveMaxPool1d, nn.AdaptiveAvgPool1d),
-        ):
+        elif _is_global_time_dim_op(wrapped_module):
             # effective kernel size in time dimension
             if self.state_shape:
                 self.ring_buffer_size_in_time_dim = self.state_shape[1]
@@ -188,3 +233,162 @@ class StreamWrapper(nn.Module):
 
         if self.ring_buffer_size_in_time_dim == 1:
             logging.warning('There is no need to use Stream on time dim with size 1')
+
+    def _build_states(self, *inputs):
+        if self.built:
+            return
+
+        prime_input = inputs[0]
+        input_shape = prime_input.shape
+        wrapped_module = self.inner_module
+
+        if _is_conv_op(wrapped_module):
+            self.state_shape = [self.inference_batch_size, self.ring_buffer_size_in_time_dim] + input_shape[1:-1]
+
+        elif _is_global_time_dim_op(wrapped_module) and not self.state_shape:
+            if self.mode in (StreamInferenceMode.TRAINING, StreamInferenceMode.Modes.NON_STREAM_INFERENCE):
+                # Only in the non-streaming modes we have access to the whole training
+                # sequence. In the streaming mode input_shape will not be available.
+                # During streaming inference we have access to one sample at a time!
+                # So we generate state shape based on input_shape during training.
+                # It will be stored in the layer config
+                # Then used by clone_streaming_model to create state buffer,
+                # during layer initialization.
+                # [batch, time, feature, ...]
+                self.state_shape = input_shape
+                self.state_shape[0] = self.inference_batch_size
+
+        elif self.ring_buffer_size_in_time_dim:
+            # it is a special case when ring_buffer_size_in_time_dim
+            # is defined by user and cell is not defined in Stream wrapper
+            self.state_shape = [self.inference_batch_size, self.ring_buffer_size_in_time_dim] + input_shape[1:-1]
+
+        # Build the state
+        if self.mode == StreamInferenceMode.STREAM_INTERNAL_STATE_INFERENCE:
+            # Create a state varaible for streaming inference mode (internal state).
+            # Where states become a weight in the layer
+            if self.ring_buffer_size_in_time_dim:
+                self.states = torch.zeros(*self.state_shape, requires_grad=False)
+                # IF INTERNAL STATE, ATTACH TO MODULE
+                self.states = nn.Parameter(self.states, requires_grad=False)
+
+        elif self.mode == StreamInferenceMode.STREAM_EXTERNAL_STATE_INFERENCE:
+            # For streaming inference with extrnal states,
+            # the states are passed in as input.
+            if self.ring_buffer_size_in_time_dim:
+                self.input_state = torch.zeros(*self.state_shape[1:])
+                # tf.keras.layers.Input(
+                #     shape=self.state_shape[1:],
+                #     batch_size=self.inference_batch_size,
+                #     name=self.name + '/' + self.state_name_tag,
+                # )  # adding names to make it unique
+            else:
+                self.input_state = None
+            self.output_state = None
+
+        self.built = True
+
+    def get_input_state(self):
+        # input state will be used only for STREAM_EXTERNAL_STATE_INFERENCE mode
+        if self.mode == StreamInferenceMode.STREAM_EXTERNAL_STATE_INFERENCE:
+            return [self.input_state]
+        else:
+            raise ValueError('Expected the layer to be in external streaming mode, ' f'not `{self.mode}`.')
+
+    def get_output_state(self):
+        # output state will be used only for STREAM_EXTERNAL_STATE_INFERENCE mode
+        if self.mode == StreamInferenceMode.STREAM_EXTERNAL_STATE_INFERENCE:
+            return [self.output_state]
+        else:
+            raise ValueError('Expected the layer to be in external streaming mode, ' f'not `{self.mode}`.')
+
+    def _non_streaming(self, *inputs):
+        # Pad inputs in time dim: causal or same
+        if self.pad_time_dim:
+            if _is_global_time_dim_op(self.inner_module):
+                raise ValueError(f'pad_time_dim can not be used with {self.inner_module.__class__.__name__}')
+
+        # temporal padding
+        input = inputs[0]
+        pad = [[0, 0]] * input.shape.rank
+        if self.use_one_step:
+            pad_total_amount = self.ring_buffer_size_in_time_dim - 1
+        else:
+            pad_total_amount = self.ring_buffer_size_in_time_dim
+
+        if self.pad_time_dim == 'causal':
+            pad[1] = [pad_total_amount, 0]
+
+        elif self.pad_time_dim == 'same':
+            half = pad_total_amount // 2
+            pad[1] = [half, pad_total_amount - half]
+
+        input = F.pad(input, pad, 'constant')
+        inputs = (input, *inputs[1:])
+
+        return self.cell(*inputs)
+
+    def _streaming_internal_state(self, *inputs):
+
+        if self.samplewise_inference:
+            input = inputs[0]
+
+            # The time dimenstion always has to equal 1 in streaming mode.
+            if input.shape[1] != 1:
+                raise ValueError('inputs[0].shape[1]: %d must be 1 ' % input.shape[1])
+
+            # remove latest row [batch_size, (memory_size-1), feature_dim, channel]
+            memory = self.states[:, 1 : self.ring_buffer_size_in_time_dim, :]
+
+            # add new row [batch_size, memory_size, feature_dim, channel]
+            memory = torch.cat([memory, input], dim=1)
+
+            # assign_states = self.states.assign(memory)
+            self.states = self.states * 0 + memory
+
+            inputs = (memory, *inputs[1:])
+            return self.cell(*inputs)
+        else:
+            # add new row [batch_size, memory_size, feature_dim, channel]
+            if self.ring_buffer_size_in_time_dim:
+                input = inputs[0]
+                memory = torch.cat([self.states, input], 1)
+
+                state_update = memory[:, -self.ring_buffer_size_in_time_dim :, :]
+
+                # assign_states = self.states.assign(state_update)
+                self.states = self.states * 0 + state_update
+
+                inputs = (state_update, *inputs[1:])
+                return self.cell(*inputs)
+            else:
+                return self.cell(*inputs)
+
+    def _streaming_external_state(self, *inputs, state):
+        state = [] if state is None else state
+        input = inputs[0]
+
+        if self.samplewise_inference:
+            # The time dimenstion always has to equal 1 in streaming mode.
+            if input.shape[1] != 1:
+                raise ValueError('inputs.shape[1]: %d must be 1 ' % input.shape[1])
+
+            # remove latest row [batch_size, (memory_size-1), feature_dim, channel]
+            memory = state[:, 1:self.ring_buffer_size_in_time_dim, :]
+
+            # add new row [batch_size, memory_size, feature_dim, channel]
+            memory = torch.cat([memory, input], dim=1)
+
+            inputs = (memory, *inputs[1:])
+
+            output = self.cell(*inputs)
+            return output, memory
+        else:
+            # add new row [batch_size, memory_size, feature_dim, channel]
+            memory = torch.cat([state, input], dim=1)
+
+            state_update = memory[:, -self.ring_buffer_size_in_time_dim:, :]
+
+            inputs = (memory, *inputs[1:])
+            output = self.cell(*inputs)
+            return output, state_update
