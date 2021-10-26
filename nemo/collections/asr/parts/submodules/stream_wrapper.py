@@ -156,7 +156,7 @@ class StreamWrapper(nn.Module):
             if self.ring_buffer_size_in_time_dim:
                 # in streaming inference mode with external state
                 # in addition to the output we return the output state.
-                output, self.output_state = self._streaming_external_state(*inputs, self.input_state)
+                output, self.output_state = self._streaming_external_state(self.input_state, *inputs)
             else:
                 # if there is no ring buffer then the input_state isn't needed.
                 output = self.cell(*inputs)
@@ -365,7 +365,7 @@ class StreamWrapper(nn.Module):
             else:
                 return self.cell(*inputs)
 
-    def _streaming_external_state(self, *inputs, state):
+    def _streaming_external_state(self, state, *inputs):
         state = [] if state is None else state
         input = inputs[0]
 
