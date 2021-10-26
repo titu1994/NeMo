@@ -17,6 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from enum import Enum
+from typing import Optional
 
 from nemo.utils import logging
 
@@ -111,13 +112,13 @@ class StreamWrapper(nn.Module):
 
     def __init__(
         self,
-        module,
-        inference_batch_size=1,
-        mode=StreamInferenceMode.TRAINING,
-        pad_time_dim=None,
-        state_shape=None,
-        ring_buffer_size_in_time_dim=None,
-        samplewise_inference=True,
+        module: torch.nn.Module,
+        inference_batch_size: int = 1,
+        mode: StreamInferenceMode = StreamInferenceMode.TRAINING,
+        pad_time_dim: Optional[int] = None,
+        state_shape: Optional[torch.Tensor] = None,
+        ring_buffer_size_in_time_dim: Optional[int] = None,
+        samplewise_inference: bool = True,
     ):
         super().__init__()
 
