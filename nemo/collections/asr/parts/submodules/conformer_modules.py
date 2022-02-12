@@ -72,6 +72,8 @@ class ConformerLayer(torch.nn.Module):
             )
         elif self_attention_model == 'abs_pos':
             self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+        elif self_attention_model is None:
+            self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
         else:
             raise ValueError(
                 f"'{self_attention_model}' is not not a valid value for 'self_attention_model', "
@@ -86,6 +88,14 @@ class ConformerLayer(torch.nn.Module):
         self.norm_out = LayerNorm(d_model)
 
     def forward(self, x, att_mask=None, pos_emb=None, pad_mask=None):
+
+        if self.self_attention_model in ['rel_pos', 'abs_pos']:
+            return self.forward_with_positional_embeddings(x, att_mask, pos_emb, pad_mask)
+
+        else:
+            return self.forward_without_positional_embeddings(x, att_mask, pos_emb, pad_mask)
+
+    def forward_with_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None):
         """
         Args:
             x (torch.Tensor): input signals (B, T, d_model)
@@ -119,6 +129,37 @@ class ConformerLayer(torch.nn.Module):
 
         x = self.norm_out(residual)
         return x
+
+    def forward_without_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None):
+        """
+        Args:
+            x (torch.Tensor): input signals (B, T, d_model)
+            att_mask (torch.Tensor): attention masks(B, T, T)
+            pos_emb (torch.Tensor): (L, 1, d_model)
+            pad_mask (torch.tensor): padding mask
+        Returns:
+            x (torch.Tensor): (B, T, d_model)
+        """
+        dtype = x.dtype
+        residual = x
+        x = self.norm_feed_forward1(x)
+        x = self.feed_forward1(x)
+        residual = residual + self.dropout(x) * self.fc_factor
+
+        x = self.norm_conv(residual)
+        x = self.conv(x, pad_mask)
+        residual = residual + self.dropout(x)
+
+        x = self.norm_self_att(residual)
+        x = self.self_attn(query=x, key=x, value=x, mask=att_mask)
+        residual = residual + self.dropout(x)
+
+        x = self.norm_feed_forward2(residual)
+        x = self.feed_forward2(x)
+        residual = residual + self.dropout(x) * self.fc_factor
+
+        x = self.norm_out(residual)
+        return x.to(dtype=dtype)
 
 
 class ConformerConvolution(nn.Module):
