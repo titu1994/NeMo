@@ -18,6 +18,7 @@ from torch.nn import LayerNorm
 
 from nemo.collections.asr.parts.submodules.multi_head_attention import (
     MultiHeadAttention,
+    CachedMultiHeadAttention,
     RelPositionMultiHeadAttention,
 )
 from nemo.collections.asr.parts.utils.activations import Swish
@@ -49,12 +50,14 @@ class ConformerLayer(torch.nn.Module):
         dropout_att=0.1,
         pos_bias_u=None,
         pos_bias_v=None,
+        cached_attention: bool = False
     ):
         super(ConformerLayer, self).__init__()
 
         self.self_attention_model = self_attention_model
         self.n_heads = n_heads
         self.fc_factor = 0.5
+        self.cached_attention = cached_attention
 
         # first feed forward module
         self.norm_feed_forward1 = LayerNorm(d_model)
@@ -73,7 +76,12 @@ class ConformerLayer(torch.nn.Module):
         elif self_attention_model == 'abs_pos':
             self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
         elif self_attention_model is None:
-            self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+            if self.cached_attention:
+                print("BUILDING CACHED ATTENTION")
+                self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+            else:
+                print("BUILDING SELF ATTENTION")
+                self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
         else:
             raise ValueError(
                 f"'{self_attention_model}' is not not a valid value for 'self_attention_model', "
@@ -87,13 +95,18 @@ class ConformerLayer(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm_out = LayerNorm(d_model)
 
-    def forward(self, x, att_mask=None, pos_emb=None, pad_mask=None):
+    def forward(self, x, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
 
         if self.self_attention_model in ['rel_pos', 'abs_pos']:
             return self.forward_with_positional_embeddings(x, att_mask, pos_emb, pad_mask)
 
         else:
-            return self.forward_without_positional_embeddings(x, att_mask, pos_emb, pad_mask)
+            if not self.cached_attention:
+                if att_cache is not None:
+                    del att_cache
+                    att_cache = None
+
+            return self.forward_without_positional_embeddings(x, att_mask, pos_emb, pad_mask, att_cache)
 
     def forward_with_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None):
         """
@@ -130,7 +143,7 @@ class ConformerLayer(torch.nn.Module):
         x = self.norm_out(residual)
         return x
 
-    def forward_without_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None):
+    def forward_without_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
         """
         Args:
             x (torch.Tensor): input signals (B, T, d_model)
@@ -151,7 +164,10 @@ class ConformerLayer(torch.nn.Module):
         residual = residual + self.dropout(x)
 
         x = self.norm_self_att(residual)
-        x = self.self_attn(query=x, key=x, value=x, mask=att_mask)
+        if self.cached_attention:
+            x = self.self_attn(attention=att_cache, value=x)
+        else:
+            x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
         residual = residual + self.dropout(x)
 
         x = self.norm_feed_forward2(residual)
@@ -159,7 +175,7 @@ class ConformerLayer(torch.nn.Module):
         residual = residual + self.dropout(x) * self.fc_factor
 
         x = self.norm_out(residual)
-        return x.to(dtype=dtype)
+        return x.to(dtype=dtype), att_cache
 
 
 class ConformerConvolution(nn.Module):
