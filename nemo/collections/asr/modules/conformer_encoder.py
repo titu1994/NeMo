@@ -27,6 +27,8 @@ from nemo.core.classes.exportable import Exportable
 from nemo.core.classes.module import NeuralModule
 from nemo.core.neural_types import AcousticEncodedRepresentation, LengthsType, NeuralType, SpectrogramType
 
+from nemo.constants import monitor_cuda_mem
+
 __all__ = ['ConformerEncoder', 'ImprovedConformerEncoder']
 
 
@@ -399,6 +401,7 @@ class ImprovedConformerEncoder(NeuralModule):
         conv_norm_type='layer_norm',
         dropout=0.1,
         dropout_att=0.0,
+        fused_batch_size: int = -1
     ):
 
         super().__init__()
@@ -423,7 +426,6 @@ class ImprovedConformerEncoder(NeuralModule):
 
         n_layers = sum(shared_layers)
         assert n_layers == n_layers
-        assert n_layers % 2 == 0
 
         n_heads = sum(shared_heads)
         assert n_heads % 2 == 0
@@ -436,8 +438,8 @@ class ImprovedConformerEncoder(NeuralModule):
             group += 1
 
         self.shared_heads = []
-        for i in range(len(shared_heads)):
-            heads = [shared_heads[i]] * shared_heads[i]
+        for i in range(len(shared_layers)):
+            heads = [shared_heads[i]] * shared_layers[i]
             self.shared_heads.extend(heads)
 
         if subsampling_conv_channels == -1:
@@ -532,11 +534,18 @@ class ImprovedConformerEncoder(NeuralModule):
         else:
             pad_mask = None
 
-        att_cache = None
-        for lth, layer in enumerate(self.layers):
-            audio_signal, att_cache = layer(
-                x=audio_signal, att_mask=att_mask, pos_emb=None, pad_mask=pad_mask, att_cache=att_cache
-            )
+        with monitor_cuda_mem('Layer loop outer', empty=True):
+            att_cache = None
+            for lth, layer in enumerate(self.layers):
+                with monitor_cuda_mem(f'Layer loop inner (idx={lth})', empty=True):
+                    audio_signal, att_cache = layer(
+                        x=audio_signal,
+                        lengths=length,
+                        att_mask=att_mask,
+                        pos_emb=None,
+                        pad_mask=pad_mask,
+                        att_cache=att_cache,
+                    )
         del att_cache
 
         if self.out_proj is not None:

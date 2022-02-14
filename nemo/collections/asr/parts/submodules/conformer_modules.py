@@ -23,6 +23,8 @@ from nemo.collections.asr.parts.submodules.multi_head_attention import (
 )
 from nemo.collections.asr.parts.utils.activations import Swish
 
+from nemo.constants import monitor_cuda_mem
+
 __all__ = ['ConformerConvolution', 'ConformerFeedForward', 'ConformerLayer']
 
 
@@ -50,7 +52,7 @@ class ConformerLayer(torch.nn.Module):
         dropout_att=0.1,
         pos_bias_u=None,
         pos_bias_v=None,
-        cached_attention: bool = False
+        cached_attention: bool = False,
     ):
         super(ConformerLayer, self).__init__()
 
@@ -95,10 +97,10 @@ class ConformerLayer(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm_out = LayerNorm(d_model)
 
-    def forward(self, x, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
+    def forward(self, x, lengths, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
 
         if self.self_attention_model in ['rel_pos', 'abs_pos']:
-            return self.forward_with_positional_embeddings(x, att_mask, pos_emb, pad_mask)
+            return self.forward_with_positional_embeddings(x, lengths, att_mask, pos_emb, pad_mask)
 
         else:
             if not self.cached_attention:
@@ -106,9 +108,9 @@ class ConformerLayer(torch.nn.Module):
                     del att_cache
                     att_cache = None
 
-            return self.forward_without_positional_embeddings(x, att_mask, pos_emb, pad_mask, att_cache)
+            return self.forward_without_positional_embeddings(x, lengths, att_mask, pos_emb, pad_mask, att_cache)
 
-    def forward_with_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None):
+    def forward_with_positional_embeddings(self, x, lengths, att_mask=None, pos_emb=None, pad_mask=None):
         """
         Args:
             x (torch.Tensor): input signals (B, T, d_model)
@@ -143,7 +145,7 @@ class ConformerLayer(torch.nn.Module):
         x = self.norm_out(residual)
         return x
 
-    def forward_without_positional_embeddings(self, x, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
+    def forward_without_positional_embeddings(self, x, lengths, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
         """
         Args:
             x (torch.Tensor): input signals (B, T, d_model)
@@ -155,24 +157,28 @@ class ConformerLayer(torch.nn.Module):
         """
         dtype = x.dtype
         residual = x
-        x = self.norm_feed_forward1(x)
-        x = self.feed_forward1(x)
-        residual = residual + self.dropout(x) * self.fc_factor
+        with monitor_cuda_mem('first feed forward', empty=True):
+            x = self.norm_feed_forward1(x)
+            x = self.feed_forward1(x)
+            residual = residual + self.dropout(x) * self.fc_factor
 
-        x = self.norm_conv(residual)
-        x = self.conv(x, pad_mask)
-        residual = residual + self.dropout(x)
+        with monitor_cuda_mem('conv', empty=True):
+            x = self.norm_conv(residual)
+            x = self.conv(x, pad_mask)
+            residual = residual + self.dropout(x)
 
-        x = self.norm_self_att(residual)
-        if self.cached_attention:
-            x = self.self_attn(attention=att_cache, value=x)
-        else:
-            x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
-        residual = residual + self.dropout(x)
+        with monitor_cuda_mem(f'attention (cached={self.cached_attention})', empty=True):
+            x = self.norm_self_att(residual)
+            if self.cached_attention:
+                x = self.self_attn(attention=att_cache, value=x)
+            else:
+                x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
+            residual = residual + self.dropout(x)
 
-        x = self.norm_feed_forward2(residual)
-        x = self.feed_forward2(x)
-        residual = residual + self.dropout(x) * self.fc_factor
+        with monitor_cuda_mem('second feed forward', empty=True):
+            x = self.norm_feed_forward2(residual)
+            x = self.feed_forward2(x)
+            residual = residual + self.dropout(x) * self.fc_factor
 
         x = self.norm_out(residual)
         return x.to(dtype=dtype), att_cache
