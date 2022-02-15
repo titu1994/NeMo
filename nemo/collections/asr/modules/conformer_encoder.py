@@ -536,18 +536,18 @@ class ImprovedConformerEncoder(NeuralModule):
         else:
             pad_mask = None
 
-        with monitor_cuda_mem('Layer loop outer', empty=True):
-            att_cache = None
-            for lth, layer in enumerate(self.layers):
-                with monitor_cuda_mem(f'Layer loop inner (idx={lth})', empty=True):
-                    audio_signal, att_cache = layer(
-                        x=audio_signal,
-                        lengths=length,
-                        att_mask=att_mask,
-                        pos_emb=None,
-                        pad_mask=pad_mask,
-                        att_cache=att_cache,
-                    )
+        # with monitor_cuda_mem('Layer loop outer', empty=True):
+        att_cache = None
+        for lth, layer in enumerate(self.layers):
+            # with monitor_cuda_mem(f'Layer loop inner (idx={lth})', empty=True):
+            audio_signal, att_cache = layer(
+                x=audio_signal,
+                lengths=length,
+                att_mask=att_mask,
+                pos_emb=None,
+                pad_mask=pad_mask,
+                att_cache=att_cache,
+            )
         del att_cache
 
         if self.out_proj is not None:

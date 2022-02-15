@@ -170,28 +170,28 @@ class ConformerLayer(torch.nn.Module):
         """
         dtype = x.dtype
         residual = x
-        with monitor_cuda_mem('first feed forward', empty=True):
-            x = self.norm_feed_forward1(x)
-            x = self.feed_forward1(x)
-            residual = residual + self.dropout(x) * self.fc_factor
+        # with monitor_cuda_mem('first feed forward', empty=True):
+        x = self.norm_feed_forward1(x)
+        x = self.feed_forward1(x)
+        residual = residual + self.dropout(x) * self.fc_factor
 
-        with monitor_cuda_mem('conv', empty=True):
-            x = self.norm_conv(residual)
-            x = self.conv(x, pad_mask)
-            residual = residual + self.dropout(x)
+        # with monitor_cuda_mem('conv', empty=True):
+        x = self.norm_conv(residual)
+        x = self.conv(x, pad_mask)
+        residual = residual + self.dropout(x)
 
-        with monitor_cuda_mem(f'attention (cached={self.cached_attention})', empty=True):
-            x = self.norm_self_att(residual)
-            if self.cached_attention:
-                x = self.self_attn(attention=att_cache, value=x)
-            else:
-                x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
-            residual = residual + self.dropout(x)
+        # with monitor_cuda_mem(f'attention (cached={self.cached_attention})', empty=True):
+        x = self.norm_self_att(residual)
+        if self.cached_attention:
+            x = self.self_attn(attention=att_cache, value=x)
+        else:
+            x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
+        residual = residual + self.dropout(x)
 
-        with monitor_cuda_mem('second feed forward', empty=True):
-            x = self.norm_feed_forward2(residual)
-            x = self.feed_forward2(x)
-            residual = residual + self.dropout(x) * self.fc_factor
+        # with monitor_cuda_mem('second feed forward', empty=True):
+        x = self.norm_feed_forward2(residual)
+        x = self.feed_forward2(x)
+        residual = residual + self.dropout(x) * self.fc_factor
 
         x = self.norm_out(residual)
         return x.to(dtype=dtype), att_cache
