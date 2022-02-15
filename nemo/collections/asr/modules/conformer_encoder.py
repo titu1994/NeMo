@@ -389,24 +389,25 @@ class ImprovedConformerEncoder(NeuralModule):
         feat_in,
         d_model,
         shared_layers,
-        shared_heads,
+        heads_per_layer,
         feat_out=-1,
         subsampling='striding',
         subsampling_factor=4,
         subsampling_conv_channels=-1,
         ff_expansion_factor=4,
+        ff_bottleneck_factor=-1,
         att_context_size=None,
         xscaling=True,
         conv_kernel_size=31,
         conv_norm_type='layer_norm',
         dropout=0.1,
         dropout_att=0.0,
-        fused_batch_size: int = -1
     ):
 
         super().__init__()
 
         d_ff = d_model * ff_expansion_factor
+        d_bottleneck = max(1, round(d_model / float(ff_bottleneck_factor))) if ff_bottleneck_factor > 0 else -1
         self.d_model = d_model
         self._feat_in = feat_in
         self.scale = math.sqrt(self.d_model)
@@ -420,14 +421,14 @@ class ImprovedConformerEncoder(NeuralModule):
         else:
             self.xscale = None
 
-        assert shared_heads is not None
+        assert heads_per_layer is not None
         assert shared_layers is not None
-        assert len(shared_heads) == len(shared_layers)
+        assert len(heads_per_layer) == len(shared_layers)
 
         n_layers = sum(shared_layers)
         assert n_layers == n_layers
 
-        n_heads = sum(shared_heads)
+        n_heads = sum(heads_per_layer)
         assert n_heads % 2 == 0
 
         group = 0
@@ -437,10 +438,10 @@ class ImprovedConformerEncoder(NeuralModule):
             self.shared_layers.extend(layers)
             group += 1
 
-        self.shared_heads = []
+        self.heads_per_layer = []
         for i in range(len(shared_layers)):
-            heads = [shared_heads[i]] * shared_layers[i]
-            self.shared_heads.extend(heads)
+            heads = [heads_per_layer[i]] * shared_layers[i]
+            self.heads_per_layer.extend(heads)
 
         if subsampling_conv_channels == -1:
             subsampling_conv_channels = d_model
@@ -470,7 +471,7 @@ class ImprovedConformerEncoder(NeuralModule):
                 d_model=d_model,
                 d_ff=d_ff,
                 self_attention_model=None,
-                n_heads=self.shared_heads[i],
+                n_heads=self.heads_per_layer[i],
                 conv_kernel_size=conv_kernel_size,
                 conv_norm_type=conv_norm_type,
                 dropout=dropout,
@@ -478,6 +479,7 @@ class ImprovedConformerEncoder(NeuralModule):
                 pos_bias_u=pos_bias_u,
                 pos_bias_v=pos_bias_v,
                 cached_attention=(group_id == group),
+                d_ff_bottleneck=d_bottleneck,
             )
             self.layers.append(layer)
             group = group_id

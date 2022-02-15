@@ -53,6 +53,7 @@ class ConformerLayer(torch.nn.Module):
         pos_bias_u=None,
         pos_bias_v=None,
         cached_attention: bool = False,
+        d_ff_bottleneck: int = -1,
     ):
         super(ConformerLayer, self).__init__()
 
@@ -63,7 +64,13 @@ class ConformerLayer(torch.nn.Module):
 
         # first feed forward module
         self.norm_feed_forward1 = LayerNorm(d_model)
-        self.feed_forward1 = ConformerFeedForward(d_model=d_model, d_ff=d_ff, dropout=dropout)
+
+        if d_ff_bottleneck < 0:
+            self.feed_forward1 = ConformerFeedForward(d_model=d_model, d_ff=d_ff, dropout=dropout)
+        else:
+            self.feed_forward1 = ConformerFeedForwardBottleneck(
+                d_model=d_model, d_ff=d_ff, d_bottleneck=d_ff_bottleneck, dropout=dropout
+            )
 
         # convolution module
         self.norm_conv = LayerNorm(d_model)
@@ -79,10 +86,8 @@ class ConformerLayer(torch.nn.Module):
             self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
         elif self_attention_model is None:
             if self.cached_attention:
-                print("BUILDING CACHED ATTENTION")
                 self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
             else:
-                print("BUILDING SELF ATTENTION")
                 self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
         else:
             raise ValueError(
@@ -92,7 +97,13 @@ class ConformerLayer(torch.nn.Module):
 
         # second feed forward module
         self.norm_feed_forward2 = LayerNorm(d_model)
-        self.feed_forward2 = ConformerFeedForward(d_model=d_model, d_ff=d_ff, dropout=dropout)
+
+        if d_ff_bottleneck < 0:
+            self.feed_forward2 = ConformerFeedForward(d_model=d_model, d_ff=d_ff, dropout=dropout)
+        else:
+            self.feed_forward2 = ConformerFeedForwardBottleneck(
+                d_model=d_model, d_ff=d_ff, d_bottleneck=d_ff_bottleneck, dropout=dropout
+            )
 
         self.dropout = nn.Dropout(dropout)
         self.norm_out = LayerNorm(d_model)
@@ -145,7 +156,9 @@ class ConformerLayer(torch.nn.Module):
         x = self.norm_out(residual)
         return x
 
-    def forward_without_positional_embeddings(self, x, lengths, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None):
+    def forward_without_positional_embeddings(
+        self, x, lengths, att_mask=None, pos_emb=None, pad_mask=None, att_cache=None
+    ):
         """
         Args:
             x (torch.Tensor): input signals (B, T, d_model)
@@ -254,6 +267,26 @@ class ConformerFeedForward(nn.Module):
         self.activation = activation
         self.dropout = nn.Dropout(p=dropout)
         self.linear2 = nn.Linear(d_ff, d_model)
+
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        x = self.linear2(x)
+        return x
+
+
+class ConformerFeedForwardBottleneck(nn.Module):
+    """
+    feed-forward module of Conformer model.
+    """
+
+    def __init__(self, d_model, d_ff, d_bottleneck, dropout, activation=Swish()):
+        super().__init__()
+        self.linear1 = nn.Sequential(nn.Linear(d_model, d_bottleneck), nn.Linear(d_bottleneck, d_ff),)
+        self.activation = activation
+        self.dropout = nn.Dropout(p=dropout)
+        self.linear2 = nn.Sequential(nn.Linear(d_ff, d_bottleneck), nn.Linear(d_bottleneck, d_model))
 
     def forward(self, x):
         x = self.linear1(x)
