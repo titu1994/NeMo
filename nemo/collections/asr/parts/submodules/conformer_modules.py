@@ -18,7 +18,9 @@ from torch.nn import LayerNorm
 
 from nemo.collections.asr.parts.submodules.multi_head_attention import (
     MultiHeadAttention,
+    MultiHeadLinearAttention,
     CachedMultiHeadAttention,
+    CachedMultiHeadLinearAttention,
     RelPositionMultiHeadAttention,
 )
 from nemo.collections.asr.parts.utils.activations import Swish
@@ -45,22 +47,26 @@ class ConformerLayer(torch.nn.Module):
         d_model,
         d_ff,
         self_attention_model='rel_pos',
+        self_attention_type='global',
         n_heads=4,
         conv_kernel_size=31,
         conv_norm_type='batch_norm',
         dropout=0.1,
         dropout_att=0.1,
+        global_pos_emb: bool = False,
         pos_bias_u=None,
         pos_bias_v=None,
-        cached_attention: bool = False,
+        shared_attention: bool = False,
         d_ff_bottleneck: int = -1,
     ):
         super(ConformerLayer, self).__init__()
 
         self.self_attention_model = self_attention_model
+        self.self_attention_type = self_attention_type
         self.n_heads = n_heads
         self.fc_factor = 0.5
-        self.cached_attention = cached_attention
+        self.shared_attention = shared_attention
+        self.global_pos_emb = global_pos_emb
 
         # first feed forward module
         self.norm_feed_forward1 = LayerNorm(d_model)
@@ -84,11 +90,24 @@ class ConformerLayer(torch.nn.Module):
             )
         elif self_attention_model == 'abs_pos':
             self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+
         elif self_attention_model is None:
-            if self.cached_attention:
-                self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+            if self.self_attention_type == 'global':
+                if self.shared_attention:
+                    self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+                else:
+                    self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+
+            elif self.self_attention_type == 'linear':
+                if self.shared_attention:
+                    self.self_attn = CachedMultiHeadLinearAttention(
+                        n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att
+                    )
+                else:
+                    self.self_attn = MultiHeadLinearAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+
             else:
-                self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+                raise ValueError("Incorrect value of `self_attention_type`")
         else:
             raise ValueError(
                 f"'{self_attention_model}' is not not a valid value for 'self_attention_model', "
@@ -114,7 +133,7 @@ class ConformerLayer(torch.nn.Module):
             return self.forward_with_positional_embeddings(x, lengths, att_mask, pos_emb, pad_mask)
 
         else:
-            if not self.cached_attention:
+            if not self.shared_attention:
                 if att_cache is not None:
                     del att_cache
                     att_cache = None
@@ -170,28 +189,41 @@ class ConformerLayer(torch.nn.Module):
         """
         dtype = x.dtype
         residual = x
-        # with monitor_cuda_mem('first feed forward', empty=True):
-        x = self.norm_feed_forward1(x)
-        x = self.feed_forward1(x)
-        residual = residual + self.dropout(x) * self.fc_factor
+        with monitor_cuda_mem('first feed forward'):
+            x = self.norm_feed_forward1(x)
+            x = self.feed_forward1(x)
+            residual = residual + self.dropout(x) * self.fc_factor
 
-        # with monitor_cuda_mem('conv', empty=True):
-        x = self.norm_conv(residual)
-        x = self.conv(x, pad_mask)
-        residual = residual + self.dropout(x)
+        with monitor_cuda_mem(f'attention (shared={self.shared_attention})'):
+            x = self.norm_self_att(residual)
 
-        # with monitor_cuda_mem(f'attention (cached={self.cached_attention})', empty=True):
-        x = self.norm_self_att(residual)
-        if self.cached_attention:
-            x = self.self_attn(attention=att_cache, value=x)
-        else:
-            x, att_cache = self.self_attn(query=x, key=x, value=x, mask=att_mask, return_attention=True)
-        residual = residual + self.dropout(x)
+            if self.self_attention_type == 'global':
+                _mask = att_mask
+            elif self.self_attention_type == 'linear':
+                _mask = pad_mask
+            else:
+                raise ValueError()
 
-        # with monitor_cuda_mem('second feed forward', empty=True):
-        x = self.norm_feed_forward2(residual)
-        x = self.feed_forward2(x)
-        residual = residual + self.dropout(x) * self.fc_factor
+            if self.global_pos_emb:
+                _pos = pos_emb
+            else:
+                _pos = None
+
+            if self.shared_attention:
+                x = self.self_attn(x, attention=att_cache, mask=_mask, pos_emb=_pos)
+            else:
+                x, att_cache = self.self_attn(query=x, key=x, value=x, mask=_mask, pos_emb=_pos, return_attention=True)
+            residual = residual + self.dropout(x)
+
+        with monitor_cuda_mem('conv'):
+            x = self.norm_conv(residual)
+            x = self.conv(x, pad_mask)
+            residual = residual + self.dropout(x)
+
+        with monitor_cuda_mem('second feed forward'):
+            x = self.norm_feed_forward2(residual)
+            x = self.feed_forward2(x)
+            residual = residual + self.dropout(x) * self.fc_factor
 
         x = self.norm_out(residual)
         return x.to(dtype=dtype), att_cache

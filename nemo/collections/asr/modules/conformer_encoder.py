@@ -27,7 +27,7 @@ from nemo.core.classes.exportable import Exportable
 from nemo.core.classes.module import NeuralModule
 from nemo.core.neural_types import AcousticEncodedRepresentation, LengthsType, NeuralType, SpectrogramType
 
-from nemo.constants import monitor_cuda_mem
+from nemo.constants import monitor_cuda_mem, monitor_time
 
 __all__ = ['ConformerEncoder', 'ImprovedConformerEncoder']
 
@@ -391,15 +391,18 @@ class ImprovedConformerEncoder(NeuralModule):
         shared_layers,
         heads_per_layer,
         feat_out=-1,
+        attn_type='global',
         subsampling='striding',
         subsampling_factor=4,
         subsampling_conv_channels=-1,
         ff_expansion_factor=4,
         ff_bottleneck_factor=-1,
         att_context_size=None,
+        global_pos_emb: bool = False,
         xscaling=True,
         conv_kernel_size=31,
         conv_norm_type='layer_norm',
+        pos_emb_max_len=5000,
         dropout=0.1,
         dropout_att=0.0,
     ):
@@ -408,9 +411,16 @@ class ImprovedConformerEncoder(NeuralModule):
 
         d_ff = d_model * ff_expansion_factor
         d_bottleneck = max(1, round(d_model / float(ff_bottleneck_factor))) if ff_bottleneck_factor > 0 else -1
+
         self.d_model = d_model
         self._feat_in = feat_in
         self.scale = math.sqrt(self.d_model)
+        self.attn_type = attn_type
+
+        valid_attn_types = ['global', 'linear']
+        if self.attn_type not in valid_attn_types:
+            raise ValueError(f"`attn_type` must be one of {valid_attn_types}")
+
         if att_context_size:
             self.att_context_size = att_context_size
         else:
@@ -461,6 +471,12 @@ class ImprovedConformerEncoder(NeuralModule):
 
         pos_bias_u = None
         pos_bias_v = None
+        self.pos_emb_max_len = pos_emb_max_len
+        self.global_pos_emb = global_pos_emb
+
+        self.pos_enc = PositionalEncoding(
+            d_model=d_model, dropout_rate=dropout, max_len=pos_emb_max_len, xscale=self.xscale
+        )
 
         group = -1
         self.layers = nn.ModuleList()
@@ -471,6 +487,7 @@ class ImprovedConformerEncoder(NeuralModule):
                 d_model=d_model,
                 d_ff=d_ff,
                 self_attention_model=None,
+                self_attention_type=self.attn_type,
                 n_heads=self.heads_per_layer[i],
                 conv_kernel_size=conv_kernel_size,
                 conv_norm_type=conv_norm_type,
@@ -478,7 +495,8 @@ class ImprovedConformerEncoder(NeuralModule):
                 dropout_att=dropout_att,
                 pos_bias_u=pos_bias_u,
                 pos_bias_v=pos_bias_v,
-                cached_attention=(group_id == group),
+                global_pos_emb=global_pos_emb,
+                shared_attention=(group_id == group),
                 d_ff_bottleneck=d_bottleneck,
             )
             self.layers.append(layer)
@@ -491,13 +509,14 @@ class ImprovedConformerEncoder(NeuralModule):
             self.out_proj = None
             self._feat_out = d_model
 
-        self.set_max_audio_length(5000)
+        self.set_max_audio_length(self.pos_emb_max_len)
         self.use_pad_mask = True
 
     @typecheck()
     def forward(self, audio_signal, length=None):
         self.update_max_seq_length(seq_length=audio_signal.size(2), device=audio_signal.device)
-        return self.forward_for_export(audio_signal=audio_signal, length=length)
+        with monitor_time('Conformer forward'):
+            return self.forward_for_export(audio_signal=audio_signal, length=length)
 
     @typecheck()
     def forward_for_export(self, audio_signal, length):
@@ -518,6 +537,9 @@ class ImprovedConformerEncoder(NeuralModule):
         else:
             audio_signal = self.pre_encode(audio_signal)
 
+        with monitor_time(f'Positional encoding ({self.pos_enc.__class__.__name__})'):
+            audio_signal, pos_emb = self.pos_enc(audio_signal)
+
         # adjust size
         max_audio_length = audio_signal.size(1)
         # Create the self-attention and padding masks
@@ -536,19 +558,19 @@ class ImprovedConformerEncoder(NeuralModule):
         else:
             pad_mask = None
 
-        # with monitor_cuda_mem('Layer loop outer', empty=True):
-        att_cache = None
-        for lth, layer in enumerate(self.layers):
-            # with monitor_cuda_mem(f'Layer loop inner (idx={lth})', empty=True):
-            audio_signal, att_cache = layer(
-                x=audio_signal,
-                lengths=length,
-                att_mask=att_mask,
-                pos_emb=None,
-                pad_mask=pad_mask,
-                att_cache=att_cache,
-            )
-        del att_cache
+        with monitor_cuda_mem('Layer loop outer'), monitor_time('Layer loop outer'):
+            att_cache = None
+            for lth, layer in enumerate(self.layers):
+                with monitor_cuda_mem(f'Layer loop inner (idx={lth})'), monitor_time(f'Layer loop inner (idx={lth})'):
+                    audio_signal, att_cache = layer(
+                        x=audio_signal,
+                        lengths=length,
+                        att_mask=att_mask,
+                        pos_emb=pos_emb,
+                        pad_mask=pad_mask,
+                        att_cache=att_cache,
+                    )
+            del att_cache
 
         if self.out_proj is not None:
             audio_signal = self.out_proj(audio_signal)
@@ -580,6 +602,7 @@ class ImprovedConformerEncoder(NeuralModule):
             self.seq_range = seq_range
         else:
             self.register_buffer('seq_range', seq_range, persistent=False)
+        self.pos_enc.extend_pe(max_audio_length, device)
 
     def make_pad_mask(self, max_audio_length, seq_lens):
         """Make masking for padding."""

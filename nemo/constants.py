@@ -22,15 +22,19 @@ NEMO_ENV_CACHE_DIR = "NEMO_CACHE_DIR"  # Used to change default nemo cache direc
 import torch
 from typing import List, Union
 
+import time
+
 
 class monitor_cuda_mem:
     _CONTEXT_DEPTH = 0
+    ENABLED = True
+    EMPTY = False
 
-    def __init__(self, scope, prev=None, empty=False, enabled: bool = True):
+    def __init__(self, scope, empty=None, enabled: bool = None, precision: int = 4):
         self.scope = scope
-        self.prev = prev
-        self.empty = empty
-        self.enabled = enabled
+        self.empty = empty if empty is not None else monitor_cuda_mem.EMPTY
+        self.enabled = enabled if enabled is not None else monitor_cuda_mem.ENABLED
+        self.precision = precision
 
     def __enter__(self):
         monitor_cuda_mem._CONTEXT_DEPTH += 1
@@ -39,21 +43,20 @@ class monitor_cuda_mem:
             self.print_pad()
             print(f"|> {self.scope}")
 
-        if self.prev is None:
             self.initial_memory = torch.cuda.memory_allocated(0)
-        else:
-            self.initial_memory = self.prev
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.empty:
-            torch.cuda.empty_cache()
-
-        self.final_memory = torch.cuda.memory_allocated(0)
-
         if self.enabled:
+            if self.empty:
+                torch.cuda.empty_cache()
+
+            self.final_memory = torch.cuda.memory_allocated(0)
+
+            memory_diff = HumanBytes.format(self.final_memory - self.initial_memory, precision=self.precision)
             self.print_pad()
-            print(f"{self.scope} |> {HumanBytes.format(self.final_memory - self.initial_memory)}")
+            print(f"{self.scope} |> {memory_diff}")
 
         monitor_cuda_mem._CONTEXT_DEPTH -= 1
 
@@ -67,15 +70,16 @@ class HumanBytes:
     # fmt: off
     METRIC_LABELS: List[str] = ["B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
     BINARY_LABELS: List[str] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
-    PRECISION_OFFSETS: List[float] = [0.5, 0.05, 0.005, 0.0005]  # PREDEFINED FOR SPEED.
-    PRECISION_FORMATS: List[str] = ["{}{:.0f} {}", "{}{:.1f} {}", "{}{:.2f} {}", "{}{:.3f} {}"]  # PREDEFINED FOR SPEED.
+    PRECISION_OFFSETS: List[float] = [5 * (0.1 ** x) for x in range(1, 22)]  # PREDEFINED FOR SPEED.
+    PRECISION_FORMATS: List[str] = [("{}{:." + str(ratio) + "f} {}") for ratio in range(len(PRECISION_OFFSETS))]  # PREDEFINED FOR SPEED.
+
     # fmt: on
 
     @staticmethod
     def format(num: Union[int, float], metric: bool = False, precision: int = 1) -> str:
         assert isinstance(num, (int, float)), "num must be an int or float"
         assert isinstance(metric, bool), "metric must be a bool"
-        assert isinstance(precision, int) and precision >= 0 and precision <= 3, "precision must be an int (range 0-3)"
+        assert isinstance(precision, int) and precision >= 0 and precision <= len(HumanBytes.PRECISION_OFFSETS), "precision must be an int (range 0-20)"
 
         unit_labels = HumanBytes.METRIC_LABELS if metric else HumanBytes.BINARY_LABELS
         last_label = unit_labels[-1]
@@ -93,3 +97,41 @@ class HumanBytes:
                 num /= unit_step
 
         return HumanBytes.PRECISION_FORMATS[precision].format("-" if is_negative else "", num, unit)
+
+
+class monitor_time:
+    _CONTEXT_DEPTH = 0
+    ENABLED = True
+    CUDA_SYNC = True
+
+    def __init__(self, scope: str, enabled: bool = None, cuda_sync: bool = None):
+        self.scope = scope
+        self.enabled = enabled if enabled is not None else monitor_time.ENABLED
+        self.cuda_sync = cuda_sync if cuda_sync is not None else monitor_time.CUDA_SYNC
+
+    def __enter__(self):
+        monitor_time._CONTEXT_DEPTH += 1
+
+        if self.enabled:
+            self.print_pad()
+            print(f"|> {self.scope}")
+
+            self.initial_time = time.time()
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.enabled:
+            if self.cuda_sync:
+                torch.cuda.synchronize()
+
+            self.final_time = time.time()
+
+            self.print_pad()
+            print(f"{self.scope} |> {(self.final_time - self.initial_time)}",)
+
+        monitor_time._CONTEXT_DEPTH -= 1
+
+    @classmethod
+    def print_pad(cls):
+        print('\t' * (cls._CONTEXT_DEPTH - 1), end='')

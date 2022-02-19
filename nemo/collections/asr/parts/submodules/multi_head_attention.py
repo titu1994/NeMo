@@ -87,7 +87,7 @@ class MultiHeadAttention(nn.Module):
 
         return q, k, v
 
-    def forward_attention(self, value, scores, mask, return_attention=False):
+    def forward_attention(self, value, scores, mask, pos_emb=None, return_attention=False):
         """Compute attention context vector.
         Args:
             value (torch.Tensor): (batch, time2, size)
@@ -97,6 +97,7 @@ class MultiHeadAttention(nn.Module):
             value (torch.Tensor): transformed `value` (batch, time2, d_model) weighted by the attention scores
         """
         n_batch = value.size(0)
+
         if mask is not None:
             mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
             scores = scores.masked_fill(mask, -10000.0)
@@ -108,10 +109,15 @@ class MultiHeadAttention(nn.Module):
         x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
         x = x.transpose(1, 2).reshape(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
 
+        out = self.linear_out(x)
+
+        if pos_emb is not None:
+            out = out + pos_emb
+
         if return_attention:
-            return self.linear_out(x), attn  # (batch, time1, d_model), (batch, head, time1, time2)
+            return out, attn  # (batch, time1, d_model), (batch, head, time1, time2)
         else:
-            return self.linear_out(x)  # (batch, time1, d_model)
+            return out  # (batch, time1, d_model)
 
     def forward(self, query, key, value, mask, pos_emb=None, return_attention=False):
         """Compute 'Scaled Dot Product Attention'.
@@ -125,7 +131,90 @@ class MultiHeadAttention(nn.Module):
         """
         q, k, v = self.forward_qkv(query, key, value)
         scores = torch.matmul(q, k.transpose(-2, -1)) / self.s_d_k
-        return self.forward_attention(v, scores, mask, return_attention)
+        return self.forward_attention(v, scores, mask, pos_emb=pos_emb, return_attention=return_attention)
+
+
+class MultiHeadLinearAttention(MultiHeadAttention):
+
+    """Multi-Head Linear Attention
+    Args:
+        dim_model: model feature dimension
+        num_heads: number of attention heads
+    References:
+        Efficient Attention: Attention with Linear Complexities, Shen et al.
+        https://arxiv.org/abs/1812.01243
+        Efficient conformer-based speech recognition with linear attention, Li et al.
+        https://arxiv.org/abs/2104.06865
+    """
+
+    def __init__(self, n_head, n_feat, dropout_rate):
+        super().__init__(n_head, n_feat, dropout_rate)
+        self.s_d_k = torch.tensor(1.0 / 4.0)
+
+    def forward_attention(self, query, key, value, pad_mask, pos_emb=None, return_attention=False):
+        """Compute attention context vector.
+        Args:
+            value (torch.Tensor): (batch, time2, size)
+            scores(torch.Tensor): (batch, time1, time2)
+            mask(torch.Tensor): (batch, time1, time2)
+        returns:
+            value (torch.Tensor): transformed `value` (batch, time2, d_model) weighted by the attention scores
+        """
+        n_batch = value.size(0)
+
+        # Global Context Vector (B, N, d, d)
+        k_scale = torch.pow(key.size(-1), self.s_d_k)
+        key = (key / k_scale)
+
+        if pad_mask is not None:
+            key = key.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), -10000.)
+            key = key.softmax(dim=-2).transpose(2, 3)  # [B, H, d_head, time2]
+            key = key.masked_fill(pad_mask.view(n_batch, 1, 1, pad_mask.size(-1)), 0.0)
+
+            value = value.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), 0.0)
+        else:
+            key = key.softmax(dim=-2).transpose(2, 3)  # [B, H, d_head, time2]
+
+        attn = key.matmul(value)  # [B, H, d_head, d_head]
+
+        # Attention Output (B, N, T, d)
+        q_scale = torch.pow(query.size(-1), self.s_d_k)
+        query = (query / q_scale)
+
+        if pad_mask is not None:
+            query = query.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), -10000.)
+            query = query.softmax(dim=-1)  # [B, H, d_head, time2]
+            query = query.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), 0.0)
+        else:
+            query = query.softmax(dim=-1)
+
+        # Transpose and Reshape (B, N, T, d) -> (B, T, D)
+        p_attn = self.dropout(attn)
+        x = query.matmul(p_attn)
+        x = x.transpose(1, 2).reshape(n_batch, -1,  self.h * self.d_k)
+
+        out = self.linear_out(x)
+
+        if pos_emb is not None:
+            out = out + pos_emb
+
+        if return_attention:
+            return out, attn  # (batch, time1, d_model), (batch, head, time1, time2)
+        else:
+            return out  # (batch, time1, d_model)
+
+    def forward(self, query, key, value, mask, pos_emb=None, return_attention=False):
+        """Compute 'Scaled Dot Product Attention'.
+        Args:
+            query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value(torch.Tensor): (batch, time2, size)
+            mask (torch.Tensor): (batch, time1, time2)
+        returns:
+            output (torch.Tensor): transformed `value` (batch, time1, d_model) weighted by the query dot key attention
+        """
+        q, k, v = self.forward_qkv(query, key, value)  # [B, H, time1/time2, d_head]
+        return self.forward_attention(q, k, v, mask, pos_emb=pos_emb, return_attention=return_attention)
 
 
 class CachedMultiHeadAttention(nn.Module):
@@ -162,7 +251,7 @@ class CachedMultiHeadAttention(nn.Module):
 
         return v
 
-    def forward_attention(self, value, attention):
+    def forward_attention(self, value, attention, pos_emb=None):
         """Compute attention context vector.
         Args:
             value (torch.Tensor): (batch, time2, size)
@@ -176,9 +265,14 @@ class CachedMultiHeadAttention(nn.Module):
         x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
         x = x.transpose(1, 2).reshape(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
 
-        return self.linear_out(x)  # (batch, time1, d_model)
+        out = self.linear_out(x)  # (batch, time1, d_model)
 
-    def forward(self, value, attention, pos_emb=None):
+        if pos_emb is not None:
+            out = out + pos_emb
+
+        return out
+
+    def forward(self, value, attention, mask=None, pos_emb=None):
         """Compute 'Scaled Dot Product Attention'.
         Args:
             query (torch.Tensor): (batch, time1, size)
@@ -189,7 +283,91 @@ class CachedMultiHeadAttention(nn.Module):
             output (torch.Tensor): transformed `value` (batch, time1, d_model) weighted by the query dot key attention
         """
         v = self.forward_v(value)
-        return self.forward_attention(v, attention)
+        return self.forward_attention(v, attention, pos_emb=pos_emb)
+
+
+class CachedMultiHeadLinearAttention(nn.Module):
+    """Multi-Head Attention layer of Transformer.
+    Args:
+        n_head (int): number of heads
+        n_feat (int): size of the features
+        dropout_rate (float): dropout rate
+    """
+
+    def __init__(self, n_head, n_feat, dropout_rate):
+        """Construct an MultiHeadedAttention object."""
+        super().__init__()
+        assert n_feat % n_head == 0
+        # We assume d_v always equals d_k
+        self.d_k = (2 * n_feat) // n_head
+        self.s_d_k = torch.tensor(1.0 / 4.0)
+        self.h = n_head
+        self.d_q = self.d_k // 2
+        self.linear_q = nn.Linear(n_feat, 2 * n_feat)
+        self.linear_out = nn.Linear(2 * n_feat, n_feat)
+        self.dropout = nn.Dropout(p=dropout_rate)
+
+    def forward_q(self, query):
+        """Transforms query, key and value.
+        Args:
+            query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value (torch.Tensor): (batch, time2, size)
+        returns:
+            v (torch.Tensor): (batch, head, time2, size)
+        """
+        n_batch = query.size(0)
+        v = self.linear_q(query).view(n_batch, -1, self.h, self.d_k)
+        v = v.transpose(1, 2)
+
+        return v
+
+    def forward_attention(self, query, attn, pad_mask, pos_emb=None):
+        """Compute attention context vector.
+        Args:
+            value (torch.Tensor): (batch, time2, size)
+            attention(torch.Tensor): (batch, head, time1, time2)
+        returns:
+            value (torch.Tensor): transformed `value` (batch, time2, d_model) weighted by the attention scores
+        """
+        n_batch = query.size(0)
+
+        # Attention Output (B, N, T, d)
+        q_scale = torch.pow(query.size(-1), self.s_d_k)
+        query = (query / q_scale)
+
+        if pad_mask is not None:
+            query = query.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), -10000.)
+            query = query.softmax(dim=-1)  # [B, H, d_head, time2]
+            query = query.masked_fill(pad_mask.view(n_batch, 1, pad_mask.size(-1), 1), 0.0)
+        else:
+            query = query.softmax(dim=-1)
+
+        # Transpose and Reshape (B, N, T, d) -> (B, T, D)
+        p_attn = self.dropout(attn)
+        x = query[:, :, :, :self.d_q].matmul(p_attn)
+        x = torch.cat([x, query[:, :, :, self.d_q:].matmul(p_attn)], dim=-1)
+        x = x.transpose(1, 2).reshape(n_batch, -1, self.h * self.d_k)
+
+        out = self.linear_out(x)  # (batch, time1, d_model)
+
+        if pos_emb is not None:
+            out = out + pos_emb
+
+        return out
+
+    def forward(self, query, attention, mask=None, pos_emb=None):
+        """Compute 'Scaled Dot Product Attention'.
+        Args:
+            query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value(torch.Tensor): (batch, time2, size)
+            mask (torch.Tensor): (batch, time1, time2)
+        returns:
+            output (torch.Tensor): transformed `value` (batch, time1, d_model) weighted by the query dot key attention
+        """
+        q = self.forward_q(query)
+        return self.forward_attention(q, attention, pad_mask=mask, pos_emb=pos_emb)
 
 
 class RelPositionMultiHeadAttention(MultiHeadAttention):
@@ -232,7 +410,7 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         x = x[:, :, 1:].view(b, h, qlen, pos_len)  # (b, h, t1, t2)
         return x
 
-    def forward(self, query, key, value, mask, pos_emb):
+    def forward(self, query, key, value, mask, pos_emb, return_attention=False):
         """Compute 'Scaled Dot Product Attention' with rel. positional encoding.
         Args:
             query (torch.Tensor): (batch, time1, size)
