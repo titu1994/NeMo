@@ -30,7 +30,7 @@ class monitor_cuda_mem:
     ENABLED = True
     EMPTY = False
 
-    def __init__(self, scope, empty=None, enabled: bool = None, precision: int = 4):
+    def __init__(self, scope, empty=None, enabled: bool = False, precision: int = 4):
         self.scope = scope
         self.empty = empty if empty is not None else monitor_cuda_mem.EMPTY
         self.enabled = enabled if enabled is not None else monitor_cuda_mem.ENABLED
@@ -104,7 +104,7 @@ class monitor_time:
     ENABLED = True
     CUDA_SYNC = True
 
-    def __init__(self, scope: str, enabled: bool = None, cuda_sync: bool = None):
+    def __init__(self, scope: str, enabled: bool = False, cuda_sync: bool = None):
         self.scope = scope
         self.enabled = enabled if enabled is not None else monitor_time.ENABLED
         self.cuda_sync = cuda_sync if cuda_sync is not None else monitor_time.CUDA_SYNC
