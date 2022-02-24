@@ -25,7 +25,7 @@ from nemo.collections.asr.parts.submodules.multi_head_attention import (
 )
 from nemo.collections.asr.parts.utils.activations import Swish
 
-from nemo.constants import monitor_cuda_mem
+from nemo.constants import monitor_cuda_mem, monitor_time
 
 __all__ = ['ConformerConvolution', 'ConformerFeedForward', 'ConformerLayer']
 
@@ -189,12 +189,12 @@ class ConformerLayer(torch.nn.Module):
         """
         dtype = x.dtype
         residual = x
-        with monitor_cuda_mem('first feed forward'):
+        with monitor_cuda_mem('first feed forward'), monitor_time('first feed forward'):
             x = self.norm_feed_forward1(x)
             x = self.feed_forward1(x)
             residual = residual + self.dropout(x) * self.fc_factor
 
-        with monitor_cuda_mem(f'attention (shared={self.shared_attention})'):
+        with monitor_cuda_mem(f'attention (shared={self.shared_attention})'), monitor_time(f'attention (shared={self.shared_attention})'):
             x = self.norm_self_att(residual)
 
             if self.self_attention_type == 'global':
@@ -215,12 +215,12 @@ class ConformerLayer(torch.nn.Module):
                 x, att_cache = self.self_attn(query=x, key=x, value=x, mask=_mask, pos_emb=_pos, return_attention=True)
             residual = residual + self.dropout(x)
 
-        with monitor_cuda_mem('conv'):
+        with monitor_cuda_mem('conv'), monitor_time('conv'):
             x = self.norm_conv(residual)
             x = self.conv(x, pad_mask)
             residual = residual + self.dropout(x)
 
-        with monitor_cuda_mem('second feed forward'):
+        with monitor_cuda_mem('second feed forward'), monitor_time('second feed forward'):
             x = self.norm_feed_forward2(residual)
             x = self.feed_forward2(x)
             residual = residual + self.dropout(x) * self.fc_factor
