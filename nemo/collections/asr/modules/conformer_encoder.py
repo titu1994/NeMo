@@ -399,6 +399,7 @@ class ImprovedConformerEncoder(NeuralModule):
         ff_bottleneck_factor=-1,
         att_context_size=None,
         global_pos_emb: bool = False,
+        untie_pos_emb: bool = False,
         xscaling=True,
         conv_kernel_size=31,
         conv_norm_type='layer_norm',
@@ -416,6 +417,7 @@ class ImprovedConformerEncoder(NeuralModule):
         self._feat_in = feat_in
         self.scale = math.sqrt(self.d_model)
         self.attn_type = attn_type
+        self.untie_pos_emb = untie_pos_emb
 
         valid_attn_types = ['global', 'linear']
         if self.attn_type not in valid_attn_types:
@@ -475,7 +477,7 @@ class ImprovedConformerEncoder(NeuralModule):
         self.global_pos_emb = global_pos_emb
 
         self.pos_enc = PositionalEncoding(
-            d_model=d_model, dropout_rate=dropout, max_len=pos_emb_max_len, xscale=self.xscale
+            d_model=d_model, dropout_rate=dropout, max_len=pos_emb_max_len, xscale=self.xscale, untie_pos_emb=untie_pos_emb
         )
 
         group = -1
@@ -498,6 +500,7 @@ class ImprovedConformerEncoder(NeuralModule):
                 global_pos_emb=global_pos_emb,
                 shared_attention=(group_id == group),
                 d_ff_bottleneck=d_bottleneck,
+                untie_pos_emb=untie_pos_emb,
             )
             self.layers.append(layer)
             group = group_id

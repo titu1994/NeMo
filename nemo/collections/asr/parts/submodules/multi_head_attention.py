@@ -52,7 +52,7 @@ class MultiHeadAttention(nn.Module):
         dropout_rate (float): dropout rate
     """
 
-    def __init__(self, n_head, n_feat, dropout_rate):
+    def __init__(self, n_head, n_feat, dropout_rate, untie_pos_emb: bool = False):
         """Construct an MultiHeadedAttention object."""
         super(MultiHeadAttention, self).__init__()
         assert n_feat % n_head == 0
@@ -65,6 +65,7 @@ class MultiHeadAttention(nn.Module):
         self.linear_v = nn.Linear(n_feat, n_feat)
         self.linear_out = nn.Linear(n_feat, n_feat)
         self.dropout = nn.Dropout(p=dropout_rate)
+        self.untie_pos_emb = untie_pos_emb
 
     def forward_qkv(self, query, key, value):
         """Transforms query, key and value.
@@ -98,12 +99,38 @@ class MultiHeadAttention(nn.Module):
         """
         n_batch = value.size(0)
 
-        if mask is not None:
-            mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
-            scores = scores.masked_fill(mask, -10000.0)
-            attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
+        if pos_emb is not None and self.untie_pos_emb:
+            # unpack
+            pq, pk, _ = self.forward_qkv(pos_emb, pos_emb, pos_emb)
+
+            if mask is not None:
+                mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
+                # word scores
+                scores = scores.masked_fill(mask, -10000.0)
+                attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
+
+                # positional scores
+                del scores
+                scores = torch.matmul(pq, pk.transpose(-2, -1)) / self.s_d_k
+                del pq, pk
+
+                scores = scores.masked_fill(mask, -10000.0)
+                # Add word and positional attention
+                attn = attn + torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
+            else:
+                attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
+                del scores
+                scores = torch.matmul(pq, pk.transpose(-2, -1)) / self.s_d_k
+                del pq, pk
+                attn = attn + torch.softmax(scores, dim=-1)
+
         else:
-            attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
+            if mask is not None:
+                mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
+                scores = scores.masked_fill(mask, -10000.0)
+                attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
+            else:
+                attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
 
         p_attn = self.dropout(attn)
         x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
@@ -131,6 +158,7 @@ class MultiHeadAttention(nn.Module):
         """
         q, k, v = self.forward_qkv(query, key, value)
         scores = torch.matmul(q, k.transpose(-2, -1)) / self.s_d_k
+
         return self.forward_attention(v, scores, mask, pos_emb=pos_emb, return_attention=return_attention)
 
 
@@ -225,7 +253,7 @@ class CachedMultiHeadAttention(nn.Module):
         dropout_rate (float): dropout rate
     """
 
-    def __init__(self, n_head, n_feat, dropout_rate):
+    def __init__(self, n_head, n_feat, dropout_rate, untie_pos_emb: bool = False):
         """Construct an MultiHeadedAttention object."""
         super().__init__()
         assert n_feat % n_head == 0
@@ -235,6 +263,7 @@ class CachedMultiHeadAttention(nn.Module):
         self.linear_v = nn.Linear(n_feat, 2 * n_feat)
         self.linear_out = nn.Linear(2 * n_feat, n_feat)
         self.dropout = nn.Dropout(p=dropout_rate)
+        self.untie_pos_emb = untie_pos_emb
 
     def forward_v(self, value):
         """Transforms query, key and value.
@@ -461,7 +490,8 @@ class PositionalEncoding(torch.nn.Module):
         dropout_rate_emb (float): dropout rate for the positional embeddings
     """
 
-    def __init__(self, d_model, dropout_rate, max_len=5000, xscale=None, dropout_rate_emb=0.0):
+    def __init__(self, d_model, dropout_rate, max_len=5000, xscale=None, dropout_rate_emb=0.0,
+                 untie_pos_emb: bool = False):
         """Construct an PositionalEncoding object."""
         super(PositionalEncoding, self).__init__()
         self.d_model = d_model
@@ -472,6 +502,7 @@ class PositionalEncoding(torch.nn.Module):
             self.dropout_emb = nn.Dropout(dropout_rate_emb)
         else:
             self.dropout_emb = None
+        self.untie_pos_emb = untie_pos_emb
 
     def create_pe(self, positions):
         pos_length = positions.size(0)
@@ -508,7 +539,9 @@ class PositionalEncoding(torch.nn.Module):
         pos_emb = self.pe[:, : x.size(1)]
         if self.dropout_emb:
             pos_emb = self.dropout_emb(pos_emb)
-        x = x + pos_emb
+
+        if not self.untie_pos_emb:
+            x = x + pos_emb
         return self.dropout(x), pos_emb
 
 

@@ -58,6 +58,7 @@ class ConformerLayer(torch.nn.Module):
         pos_bias_v=None,
         shared_attention: bool = False,
         d_ff_bottleneck: int = -1,
+        untie_pos_emb: bool = False,
     ):
         super(ConformerLayer, self).__init__()
 
@@ -67,6 +68,7 @@ class ConformerLayer(torch.nn.Module):
         self.fc_factor = 0.5
         self.shared_attention = shared_attention
         self.global_pos_emb = global_pos_emb
+        self.untie_pos_emb = untie_pos_emb
 
         # first feed forward module
         self.norm_feed_forward1 = LayerNorm(d_model)
@@ -96,7 +98,8 @@ class ConformerLayer(torch.nn.Module):
                 if self.shared_attention:
                     self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
                 else:
-                    self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+                    self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att,
+                                                        untie_pos_emb=untie_pos_emb)
 
             elif self.self_attention_type == 'linear':
                 if self.shared_attention:
