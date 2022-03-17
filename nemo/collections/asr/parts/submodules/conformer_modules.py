@@ -96,7 +96,8 @@ class ConformerLayer(torch.nn.Module):
         elif self_attention_model is None:
             if self.self_attention_type == 'global':
                 if self.shared_attention:
-                    self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
+                    self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att,
+                                                              untie_pos_emb=untie_pos_emb)
                 else:
                     self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att,
                                                         untie_pos_emb=untie_pos_emb)
@@ -207,7 +208,7 @@ class ConformerLayer(torch.nn.Module):
             else:
                 raise ValueError()
 
-            if self.global_pos_emb:
+            if self.global_pos_emb or self.untie_pos_emb:
                 _pos = pos_emb
             else:
                 _pos = None

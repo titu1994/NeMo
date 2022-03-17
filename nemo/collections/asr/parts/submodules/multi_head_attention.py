@@ -67,6 +67,8 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)
         self.untie_pos_emb = untie_pos_emb
 
+        self.apply_attn_softmax = True
+
     def forward_qkv(self, query, key, value):
         """Transforms query, key and value.
         Args:
@@ -100,37 +102,23 @@ class MultiHeadAttention(nn.Module):
         n_batch = value.size(0)
 
         if pos_emb is not None and self.untie_pos_emb:
-            # unpack
-            pq, pk, _ = self.forward_qkv(pos_emb, pos_emb, pos_emb)
+            # unpack pos info
+            pos_emb, pos_att_cache = pos_emb
+            scores = scores + pos_att_cache
 
-            if mask is not None:
-                mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
-                # word scores
-                scores = scores.masked_fill(mask, -10000.0)
+        if mask is not None:
+            mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
+            scores = scores.masked_fill(mask, -10000.0)
+
+            if self.apply_attn_softmax:
                 attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
-
-                # positional scores
-                del scores
-                scores = torch.matmul(pq, pk.transpose(-2, -1)) / self.s_d_k
-                del pq, pk
-
-                scores = scores.masked_fill(mask, -10000.0)
-                # Add word and positional attention
-                attn = attn + torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
             else:
-                attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
-                del scores
-                scores = torch.matmul(pq, pk.transpose(-2, -1)) / self.s_d_k
-                del pq, pk
-                attn = attn + torch.softmax(scores, dim=-1)
-
+                attn = scores.masked_fill(mask, 0.0)
         else:
-            if mask is not None:
-                mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
-                scores = scores.masked_fill(mask, -10000.0)
-                attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
-            else:
+            if self.apply_attn_softmax:
                 attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
+            else:
+                attn = scores
 
         p_attn = self.dropout(attn)
         x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
@@ -138,7 +126,7 @@ class MultiHeadAttention(nn.Module):
 
         out = self.linear_out(x)
 
-        if pos_emb is not None:
+        if pos_emb is not None and not self.untie_pos_emb:
             out = out + pos_emb
 
         if return_attention:
@@ -223,7 +211,7 @@ class MultiHeadLinearAttention(MultiHeadAttention):
 
         out = self.linear_out(x)
 
-        if pos_emb is not None:
+        if pos_emb is not None and not self.untie_pos_emb:
             out = out + pos_emb
 
         if return_attention:

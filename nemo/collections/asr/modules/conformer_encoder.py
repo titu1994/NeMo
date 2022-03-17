@@ -19,7 +19,7 @@ import torch
 import torch.distributed
 import torch.nn as nn
 
-from nemo.collections.asr.parts.submodules.conformer_modules import ConformerLayer
+from nemo.collections.asr.parts.submodules.conformer_modules import ConformerLayer, MultiHeadAttention
 from nemo.collections.asr.parts.submodules.multi_head_attention import PositionalEncoding, RelPositionalEncoding
 from nemo.collections.asr.parts.submodules.subsampling import ConvSubsampling
 from nemo.core.classes.common import typecheck
@@ -480,6 +480,12 @@ class ImprovedConformerEncoder(NeuralModule):
             d_model=d_model, dropout_rate=dropout, max_len=pos_emb_max_len, xscale=self.xscale, untie_pos_emb=untie_pos_emb
         )
 
+        if self.untie_pos_emb:
+            self.pos_mha = MultiHeadAttention(n_head=1, n_feat=d_model, dropout_rate=0.0)
+            self.pos_mha.apply_attn_softmax = False  # explicitly disable softmax calculation for attention scores
+        else:
+            self.pos_mha = None
+
         group = -1
         self.layers = nn.ModuleList()
         for i in range(n_layers):
@@ -560,6 +566,12 @@ class ImprovedConformerEncoder(NeuralModule):
             pad_mask = ~pad_mask
         else:
             pad_mask = None
+
+        if self.pos_mha is not None:
+            temp_pos_emb = pos_emb  # .repeat(audio_signal.size(0), 1, 1)
+            _, pos_att_cache = self.pos_mha(temp_pos_emb, temp_pos_emb, temp_pos_emb, mask=att_mask, return_attention=True)
+            # augment pos_emb with pos_att_cache
+            pos_emb = (pos_emb, pos_att_cache)
 
         with monitor_cuda_mem('Layer loop outer'), monitor_time('Layer loop outer'):
             att_cache = None
