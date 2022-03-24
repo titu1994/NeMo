@@ -21,6 +21,7 @@ from nemo.collections.asr.parts.submodules.multi_head_attention import (
     MultiHeadLinearAttention,
     CachedMultiHeadAttention,
     CachedMultiHeadLinearAttention,
+    CachedRelPositionMultiHeadAttention,
     RelPositionMultiHeadAttention,
 )
 from nemo.collections.asr.parts.utils.activations import Swish
@@ -96,11 +97,33 @@ class ConformerLayer(torch.nn.Module):
         elif self_attention_model is None:
             if self.self_attention_type == 'global':
                 if self.shared_attention:
-                    self.self_attn = CachedMultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att,
-                                                              untie_pos_emb=untie_pos_emb)
+                    self.self_attn = CachedMultiHeadAttention(
+                        n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att, untie_pos_emb=untie_pos_emb
+                    )
                 else:
-                    self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att,
-                                                        untie_pos_emb=untie_pos_emb)
+                    self.self_attn = MultiHeadAttention(
+                        n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att, untie_pos_emb=untie_pos_emb
+                    )
+
+            elif self.self_attention_type == 'rel_global':
+                if self.shared_attention:
+                    self.self_attn = CachedRelPositionMultiHeadAttention(
+                        n_head=n_heads,
+                        n_feat=d_model,
+                        dropout_rate=dropout_att,
+                        pos_bias_u=pos_bias_u,
+                        pos_bias_v=pos_bias_v,
+                        untie_pos_emb=untie_pos_emb,
+                    )
+                else:
+                    self.self_attn = RelPositionMultiHeadAttention(
+                        n_head=n_heads,
+                        n_feat=d_model,
+                        dropout_rate=dropout_att,
+                        pos_bias_u=pos_bias_u,
+                        pos_bias_v=pos_bias_v,
+                        untie_pos_emb=untie_pos_emb,
+                    )
 
             elif self.self_attention_type == 'linear':
                 if self.shared_attention:
@@ -198,17 +221,19 @@ class ConformerLayer(torch.nn.Module):
             x = self.feed_forward1(x)
             residual = residual + self.dropout(x) * self.fc_factor
 
-        with monitor_cuda_mem(f'attention (shared={self.shared_attention})'), monitor_time(f'attention (shared={self.shared_attention})'):
+        with monitor_cuda_mem(f'attention (shared={self.shared_attention})'), monitor_time(
+            f'attention (shared={self.shared_attention})'
+        ):
             x = self.norm_self_att(residual)
 
-            if self.self_attention_type == 'global':
+            if self.self_attention_type in ('global', 'rel_global'):
                 _mask = att_mask
             elif self.self_attention_type == 'linear':
                 _mask = pad_mask
             else:
                 raise ValueError()
 
-            if self.global_pos_emb or self.untie_pos_emb:
+            if self.global_pos_emb or self.untie_pos_emb or self.self_attention_type == 'rel_global':
                 _pos = pos_emb
             else:
                 _pos = None

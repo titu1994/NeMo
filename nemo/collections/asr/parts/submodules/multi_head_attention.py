@@ -126,8 +126,8 @@ class MultiHeadAttention(nn.Module):
 
         out = self.linear_out(x)
 
-        if pos_emb is not None and not self.untie_pos_emb:
-            out = out + pos_emb
+        # if pos_emb is not None and not self.untie_pos_emb:
+        #     out = out + pos_emb
 
         if return_attention:
             return out, attn  # (batch, time1, d_model), (batch, head, time1, time2)
@@ -211,8 +211,8 @@ class MultiHeadLinearAttention(MultiHeadAttention):
 
         out = self.linear_out(x)
 
-        if pos_emb is not None and not self.untie_pos_emb:
-            out = out + pos_emb
+        # if pos_emb is not None and not self.untie_pos_emb:
+        #     out = out + pos_emb
 
         if return_attention:
             return out, attn  # (batch, time1, d_model), (batch, head, time1, time2)
@@ -396,9 +396,9 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         dropout_rate (float): dropout rate
     """
 
-    def __init__(self, n_head, n_feat, dropout_rate, pos_bias_u, pos_bias_v):
+    def __init__(self, n_head, n_feat, dropout_rate, pos_bias_u, pos_bias_v, untie_pos_emb=False):
         """Construct an RelPositionMultiHeadedAttention object."""
-        super().__init__(n_head, n_feat, dropout_rate)
+        super().__init__(n_head, n_feat, dropout_rate, untie_pos_emb)
         # linear transformation for positional encoding
         self.linear_pos = nn.Linear(n_feat, n_feat, bias=False)
         # these two learnable biases are used in matrix c and matrix d
@@ -441,6 +441,10 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         q, k, v = self.forward_qkv(query, key, value)
         q = q.transpose(1, 2)  # (batch, time1, head, d_k)
 
+        if pos_emb is not None and self.untie_pos_emb:
+            # unpack pos info
+            pos_emb, pos_att_cache = pos_emb
+
         n_batch_pos = pos_emb.size(0)
         p = self.linear_pos(pos_emb).view(n_batch_pos, -1, self.h, self.d_k)
         p = p.transpose(1, 2)  # (batch, head, time1, d_k)
@@ -465,7 +469,108 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
 
         scores = (matrix_ac + matrix_bd) / self.s_d_k  # (batch, head, time1, time2)
 
-        return self.forward_attention(v, scores, mask)
+        if pos_emb is not None and self.untie_pos_emb:
+            # repack the pos emb
+            pos_emb = (pos_emb, pos_att_cache)
+
+        return self.forward_attention(v, scores, mask, pos_emb=pos_emb, return_attention=return_attention)
+
+
+class CachedRelPositionMultiHeadAttention(nn.Module):
+    """Multi-Head Attention layer of Transformer.
+    Args:
+        n_head (int): number of heads
+        n_feat (int): size of the features
+        dropout_rate (float): dropout rate
+    """
+
+    def __init__(self, n_head, n_feat, dropout_rate, pos_bias_u, pos_bias_v, untie_pos_emb: bool = False):
+        """Construct an MultiHeadedAttention object."""
+        super().__init__()
+        assert n_feat % n_head == 0
+        # We assume d_v always equals d_k
+        self.d_k = (2 * n_feat) // n_head
+        self.h = n_head
+        self.linear_v = nn.Linear(n_feat, 2 * n_feat)
+        self.linear_out = nn.Linear(2 * n_feat, n_feat)
+        self.dropout = nn.Dropout(p=dropout_rate)
+
+        # # these two learnable biases are used in matrix c and matrix d
+        # # as described in https://arxiv.org/abs/1901.02860 Section 3.3
+        # if pos_bias_u is None or pos_bias_v is None:
+        #     self.pos_bias_u = nn.Parameter(torch.FloatTensor(self.h, self.d_k))
+        #     self.pos_bias_v = nn.Parameter(torch.FloatTensor(self.h, self.d_k))
+        #     # nn.init.normal_(self.pos_bias_u, 0.0, 0.02)
+        #     # nn.init.normal_(self.pos_bias_v, 0.0, 0.02)
+        #     nn.init.zeros_(self.pos_bias_u)
+        #     nn.init.zeros_(self.pos_bias_v)
+        # else:
+        #     self.pos_bias_u = pos_bias_u
+        #     self.pos_bias_v = pos_bias_v
+
+        self.untie_pos_emb = untie_pos_emb
+
+    def rel_shift(self, x):
+        """Compute relative positional encoding.
+        Args:
+            x (torch.Tensor): (batch, nheads, time, 2*time-1)
+        """
+        b, h, qlen, pos_len = x.size()  # (b, h, t1, t2)
+        # need to add a column of zeros on the left side of last dimension to perform the relative shifting
+        x = torch.nn.functional.pad(x, pad=(1, 0))  # (b, h, t1, t2+1)
+        x = x.view(b, h, -1, qlen)  # (b, h, t2+1, t1)
+        # need to drop the first row
+        x = x[:, :, 1:].view(b, h, qlen, pos_len)  # (b, h, t1, t2)
+        return x
+
+    def forward_v(self, value):
+        """Transforms query, key and value.
+        Args:
+            query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value (torch.Tensor): (batch, time2, size)
+        returns:
+            v (torch.Tensor): (batch, head, time2, size)
+        """
+        n_batch = value.size(0)
+        v = self.linear_v(value).view(n_batch, -1, self.h, self.d_k)
+        v = v.transpose(1, 2)
+
+        return v
+
+    def forward_attention(self, value, attention, pos_emb=None):
+        """Compute attention context vector.
+        Args:
+            value (torch.Tensor): (batch, time2, size)
+            attention(torch.Tensor): (batch, head, time1, time2)
+        returns:
+            value (torch.Tensor): transformed `value` (batch, time2, d_model) weighted by the attention scores
+        """
+        n_batch = value.size(0)
+
+        p_attn = self.dropout(attention)
+        x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
+        x = x.transpose(1, 2).reshape(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
+
+        out = self.linear_out(x)  # (batch, time1, d_model)
+
+        # if pos_emb is not None:
+        #     out = out + pos_emb
+
+        return out
+
+    def forward(self, value, attention, mask=None, pos_emb=None):
+        """Compute 'Scaled Dot Product Attention'.
+        Args:
+            query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value(torch.Tensor): (batch, time2, size)
+            mask (torch.Tensor): (batch, time1, time2)
+        returns:
+            output (torch.Tensor): transformed `value` (batch, time1, d_model) weighted by the query dot key attention
+        """
+        v = self.forward_v(value)
+        return self.forward_attention(v, attention, pos_emb=pos_emb)
 
 
 class PositionalEncoding(torch.nn.Module):

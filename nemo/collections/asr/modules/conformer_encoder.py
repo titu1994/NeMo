@@ -400,12 +400,14 @@ class ImprovedConformerEncoder(NeuralModule):
         att_context_size=None,
         global_pos_emb: bool = False,
         untie_pos_emb: bool = False,
+        untie_biases: bool = False,
         xscaling=True,
         conv_kernel_size=31,
         conv_norm_type='layer_norm',
         pos_emb_max_len=5000,
         dropout=0.1,
         dropout_att=0.0,
+        dropout_emb=0.0,
     ):
 
         super().__init__()
@@ -419,7 +421,7 @@ class ImprovedConformerEncoder(NeuralModule):
         self.attn_type = attn_type
         self.untie_pos_emb = untie_pos_emb
 
-        valid_attn_types = ['global', 'linear']
+        valid_attn_types = ['global', 'rel_global', 'linear']
         if self.attn_type not in valid_attn_types:
             raise ValueError(f"`attn_type` must be one of {valid_attn_types}")
 
@@ -471,14 +473,35 @@ class ImprovedConformerEncoder(NeuralModule):
             self.pre_encode = nn.Linear(feat_in, d_model)
             self._feat_out = d_model
 
-        pos_bias_u = None
-        pos_bias_v = None
         self.pos_emb_max_len = pos_emb_max_len
         self.global_pos_emb = global_pos_emb
 
-        self.pos_enc = PositionalEncoding(
-            d_model=d_model, dropout_rate=dropout, max_len=pos_emb_max_len, xscale=self.xscale, untie_pos_emb=untie_pos_emb
-        )
+        if not untie_biases:
+            d_head = d_model // n_heads
+            pos_bias_u = nn.Parameter(torch.Tensor(n_heads, d_head))
+            pos_bias_v = nn.Parameter(torch.Tensor(n_heads, d_head))
+            nn.init.zeros_(pos_bias_u)
+            nn.init.zeros_(pos_bias_v)
+        else:
+            pos_bias_u = None
+            pos_bias_v = None
+
+        if not untie_biases:
+            self.pos_enc = PositionalEncoding(
+                d_model=d_model,
+                dropout_rate=dropout,
+                max_len=pos_emb_max_len,
+                xscale=self.xscale,
+                untie_pos_emb=untie_pos_emb,
+            )
+        else:
+            self.pos_enc = RelPositionalEncoding(
+                d_model=d_model,
+                dropout_rate=dropout,
+                max_len=pos_emb_max_len,
+                xscale=self.xscale,
+                dropout_rate_emb=dropout_emb,
+            )
 
         if self.untie_pos_emb:
             self.pos_mha = MultiHeadAttention(n_head=1, n_feat=d_model, dropout_rate=0.0)
@@ -569,7 +592,9 @@ class ImprovedConformerEncoder(NeuralModule):
 
         if self.pos_mha is not None:
             temp_pos_emb = pos_emb  # .repeat(audio_signal.size(0), 1, 1)
-            _, pos_att_cache = self.pos_mha(temp_pos_emb, temp_pos_emb, temp_pos_emb, mask=att_mask, return_attention=True)
+            _, pos_att_cache = self.pos_mha(
+                temp_pos_emb, temp_pos_emb, temp_pos_emb, mask=att_mask, return_attention=True
+            )
             # augment pos_emb with pos_att_cache
             pos_emb = (pos_emb, pos_att_cache)
 
