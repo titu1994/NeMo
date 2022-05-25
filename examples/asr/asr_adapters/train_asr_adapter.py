@@ -72,6 +72,46 @@ from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from nemo.utils.exp_manager import exp_manager
 
+"""
+# Preprocessor adapters
+
+python train_asr_adapter.py \
+    --config-path="../conf/asr_adapters" \
+    --config-name="asr_adaptation.yaml" \
+    model.pretrained_model=stt_en_contextnet_1024 \
+    model.nemo_model=null \
+    model.adapter.adapter_name=gsc_v2 \
+    model.adapter.adapter_module_name='preprocessor' \
+    model.adapter.in_features=640 \
+    model.adapter.dim=640 \
+    model.adapter.dropout=0.9 \
+    model.adapter.adapter_strategy.stochastic_depth=0.1 \
+    model.train_ds.manifest_filepath="/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_train_manifest_asr.json" \
+    model.train_ds.batch_size=128 \
+    model.validation_ds.manifest_filepath=["/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_validation_manifest_asr.json","/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_test_manifest_asr.json"] \
+    model.validation_ds.batch_size=32 \
+    model.spec_augment.time_masks=0 \
+    model.spec_augment.freq_masks=0 \
+    model.optim.name=adamw \
+    model.optim.betas=[0.9,0.98] \
+    model.optim.lr=0.001 \
+    model.optim.weight_decay=0.0 \
+    model.optim.sched.warmup_steps=100 \
+    model.optim.sched.min_lr=0.00001 \
+    trainer.max_steps=null \
+    trainer.max_epochs=1 \
+    trainer.devices=[1] \
+    trainer.precision=32 \
+    trainer.log_every_n_steps=10 \
+    trainer.val_check_interval=1.0 \
+    exp_manager.exp_dir=null \
+    exp_manager.create_wandb_logger=true \
+    exp_manager.wandb_logger_kwargs.name="GSC-V2-preprocessor" \
+    exp_manager.wandb_logger_kwargs.project="Adapters-GSC-V2-Local-Preprocessor-debug"
+    
+
+"""
+
 
 def update_model_config_to_support_adapter(model_cfg, current_cfg):
     with open_dict(model_cfg):

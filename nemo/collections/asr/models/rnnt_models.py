@@ -875,8 +875,20 @@ class EncDecRNNTModel(ASRModel, ASRModuleMixin, Exportable):
         temporary_datalayer = self._setup_dataloader_from_config(config=DictConfig(dl_config))
         return temporary_datalayer
 
+    def on_before_backward(self, loss: torch.Tensor) -> None:
+        # for name, param in self.named_parameters():
+        #     if param.requires_grad:
+        #         print(name, param.requires_grad)
+
+        super(EncDecRNNTModel, self).on_before_backward(loss)
+
     def on_after_backward(self):
         super().on_after_backward()
+
+        # for name, param in self.preprocessor.named_parameters():
+        #     if param.grad is not None:
+        #         print(name, param.grad.norm())
+
         if self._optim_variational_noise_std > 0 and self.global_step >= self._optim_variational_noise_start:
             for param_name, param in self.decoder.named_parameters():
                 if param.grad is not None:

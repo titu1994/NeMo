@@ -106,6 +106,10 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
                     # Dispatch call to the joint.
                     self.joint.add_adapter(name=name, cfg=cfg)
 
+                if module_name == 'preprocessor':
+                    logging.info(f"Adding adapter with name `{name}` to Preprocessor")
+                    self.preprocessor.add_adapter(name=name, cfg=cfg)
+
     def is_adapter_available(self) -> bool:
         """
         Checks if any Adapter module has been instantiated.
@@ -125,6 +129,9 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
 
         if hasattr(self, 'joint') and isinstance(self.joint, AdapterModuleMixin):
             config_contains_adapter |= self.joint.is_adapter_available()
+
+        if hasattr(self, 'preprocessor') and isinstance(self.preprocessor, AdapterModuleMixin):
+            config_contains_adapter |= self.preprocessor.is_adapter_available()
 
         return config_contains_adapter
 
@@ -178,6 +185,10 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
                 if hasattr(self, 'joint') and self.joint.is_adapter_available():
                     self.joint.set_enabled_adapters(name=name, enabled=enabled)
 
+            if name is None or module_name == 'preprocessor':
+                if self.preprocessor.is_adapter_available():
+                    self.preprocessor.set_enabled_adapters(name=name, enabled=enabled)
+
     def get_enabled_adapters(self) -> List[str]:
         """
         Returns a list of all enabled adapters.
@@ -196,6 +207,9 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
 
         if hasattr(self, 'joint') and isinstance(self.joint, AdapterModuleMixin):
             enabled_adapters.extend(self.joint.get_enabled_adapters())
+
+        if hasattr(self, 'preprocessor') and isinstance(self.preprocessor, AdapterModuleMixin):
+            enabled_adapters.extend(self.preprocessor.get_enabled_adapters())
 
         enabled_adapters = list(sorted(list(set(enabled_adapters))))
 
@@ -247,6 +261,12 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
                     f'{self.joint.__class__.__name__} does not implement `AdapterModuleMixin`', mode=logging_mode.ONCE
                 )
 
+        if hasattr(self, 'preprocessor') and not isinstance(self.preprocessor, AdapterModuleMixin):
+            logging.warning(
+                f'{self.preprocessor.__class__.__name__} does not implement `AdapterModuleMixin`',
+                mode=logging_mode.ONCE,
+            )
+
     def resolve_adapter_module_name_(self, name: str) -> (str, str):
         """
         Utility method to resolve a given global/module adapter name to its components.
@@ -291,5 +311,5 @@ class ASRAdapterModelMixin(AdapterModelPTMixin):
 
     @property
     def adapter_module_names(self) -> List[str]:
-        valid_module_names = ['', 'encoder', 'decoder', 'joint']
+        valid_module_names = ['', 'encoder', 'decoder', 'joint', 'preprocessor']
         return valid_module_names

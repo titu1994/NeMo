@@ -33,6 +33,8 @@ from nemo.core.neural_types import (
     NeuralType,
     SpectrogramType,
 )
+from nemo.core.classes import adapter_mixins
+from nemo.collections.asr.parts.submodules import adapter_modules
 from nemo.core.utils import numba_utils
 from nemo.core.utils.numba_utils import __NUMBA_MINIMUM_VERSION__
 from nemo.utils import logging
@@ -58,7 +60,7 @@ __all__ = [
 ]
 
 
-class AudioPreprocessor(NeuralModule, ABC):
+class AudioPreprocessor(NeuralModule, adapter_mixins.AdapterModuleMixin, ABC):
     """
         An interface for Neural Modules that performs audio pre-processing,
         transforming the wav files to features.
@@ -80,9 +82,13 @@ class AudioPreprocessor(NeuralModule, ABC):
         }
 
     @typecheck()
-    @torch.no_grad()
     def forward(self, input_signal, length):
-        processed_signal, processed_length = self.get_features(input_signal, length)
+        with torch.no_grad():
+            processed_signal, processed_length = self.get_features(input_signal, length)
+
+        if self.is_adapter_available():
+            processed_signal, processed_length = self.forward_enabled_adapters(([processed_signal], processed_length))
+            processed_signal = processed_signal[-1]
 
         return processed_signal, processed_length
 
@@ -90,6 +96,30 @@ class AudioPreprocessor(NeuralModule, ABC):
     def get_features(self, input_signal, length):
         # Called by forward(). Subclasses should implement this.
         pass
+
+    def resolve_adapter_module_name_(self, name: str) -> (str, str):
+        module_name, adapter_name = super().resolve_adapter_module_name_(name)
+
+        if module_name != 'preprocessor':
+            raise ValueError('Module name must be `preprocessor` for this adapter !')
+
+        return (module_name, adapter_name)
+
+    def forward_single_enabled_adapter_(
+        self,
+        input: torch.Tensor,
+        adapter_module: torch.nn.Module,
+        *,
+        adapter_name: str,
+        adapter_strategy: 'nemo.core.classes.mixins.adapter_mixin_strategies.AbstractAdapterStrategy',
+    ):
+        if isinstance(adapter_module, adapter_modules.MaskedConvAdapter):
+            return super().forward_single_enabled_adapter_(
+                input, adapter_module, adapter_name=adapter_name, adapter_strategy=adapter_strategy
+            )
+        else:
+            # skip adapter step if any invalid adapter
+            return input
 
 
 class AudioToMelSpectrogramPreprocessor(AudioPreprocessor):

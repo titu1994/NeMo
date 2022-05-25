@@ -23,6 +23,8 @@ __all__ = ['if_exist', '_compute_softmax']
 activation_registry = {
     "identity": nn.Identity,
     "hardtanh": nn.Hardtanh,
+    "tanh": nn.Tanh,
+    "sigmoid": nn.Sigmoid,
     "relu": nn.ReLU,
     "selu": nn.SELU,
     "swish": nn.SiLU,
