@@ -23,6 +23,7 @@ from nemo.collections.asr.parts.submodules import subsampling
 from nemo.collections.common.parts import adapter_modules
 from nemo.collections.common.parts.utils import activation_registry
 from nemo.core.classes.mixins import adapter_mixin_strategies
+from nemo.utils import logging
 
 
 class MaskedConvResidualAddAdapterStrategy(adapter_mixin_strategies.AbstractAdapterStrategy):
@@ -46,8 +47,8 @@ class MaskedConvResidualAddAdapterStrategy(adapter_mixin_strategies.AbstractAdap
         # add residual connection with input
         audio_signal = input_audio_signal + audio_signal
 
-        print("input - adapter abs diff", (audio_signal - input_audio_signal).abs().mean())
-        # print("val", (input_audio_signal[0, 0, :] - audio_signal[0, 0, :]))
+        logging.info(f"input - adapter abs diff {(audio_signal - input_audio_signal).abs().mean()}")
+        # logging.info(f"val ({input_audio_signal[0, 0, :] - audio_signal[0, 0, :]})")
 
         del input_audio_signal
 

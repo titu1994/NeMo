@@ -82,10 +82,15 @@ python train_asr_adapter.py \
     model.nemo_model=null \
     model.adapter.adapter_name=gsc_v2 \
     model.adapter.adapter_module_name='preprocessor' \
-    model.adapter.in_features=640 \
+    model.adapter.in_features=80 \
     model.adapter.dim=640 \
     model.adapter.dropout=0.9 \
     model.adapter.adapter_strategy.stochastic_depth=0.1 \
+    model.adapter._target_="nemo.collections.asr.parts.submodules.adapter_modules.MaskedConvAdapter" \
+    ++model.adapter.repeat=1 \
+    ~model.adapter.dim \
+    ~model.adapter.norm_position \
+    ~model.adapter.adapter_strategy \
     model.train_ds.manifest_filepath="/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_train_manifest_asr.json" \
     model.train_ds.batch_size=128 \
     model.validation_ds.manifest_filepath=["/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_validation_manifest_asr.json","/home/smajumdar/PycharmProjects/nemo-eval/nemo_beta_eval/speech_commands/manifests/v2_test_manifest_asr.json"] \

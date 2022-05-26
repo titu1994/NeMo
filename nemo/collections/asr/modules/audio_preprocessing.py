@@ -118,8 +118,7 @@ class AudioPreprocessor(NeuralModule, adapter_mixins.AdapterModuleMixin, ABC):
                 input, adapter_module, adapter_name=adapter_name, adapter_strategy=adapter_strategy
             )
         else:
-            # skip adapter step if any invalid adapter
-            return input
+            raise ValueError(f'Incorrect adapter module provided ! Required {adapter_modules.MaskedConvAdapter.__name__}')
 
 
 class AudioToMelSpectrogramPreprocessor(AudioPreprocessor):
