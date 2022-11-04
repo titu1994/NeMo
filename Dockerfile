@@ -32,11 +32,11 @@ RUN apt-get update && \
     python-dev ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /tmp/
-RUN git clone https://github.com/NVIDIA/apex.git && \
-    cd apex && \
-    git checkout 2b0e8371113fe70758f1964c40bf7dbe304fd9e6 && \
-    pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" --global-option="--fast_layer_norm" --global-option="--distributed_adam" --global-option="--deprecated_fused_adam" ./
+# WORKDIR /tmp/
+# RUN git clone https://github.com/NVIDIA/apex.git && \
+#     cd apex && \
+#     git checkout 2b0e8371113fe70758f1964c40bf7dbe304fd9e6 && \
+#     pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" --global-option="--fast_layer_norm" --global-option="--distributed_adam" --global-option="--deprecated_fused_adam" ./
 
 # uninstall stuff from base container
 RUN pip uninstall -y sacrebleu torchtext
@@ -56,8 +56,8 @@ COPY nemo_text_processing/install_pynini.sh /tmp/nemo/
 RUN /bin/bash /tmp/nemo/install_pynini.sh
 
 # install k2, skip if installation fails
-COPY scripts /tmp/nemo/scripts/
-RUN /bin/bash /tmp/nemo/scripts/speech_recognition/k2/setup.sh || exit 0
+# COPY scripts /tmp/nemo/scripts/
+# RUN /bin/bash /tmp/nemo/scripts/speech_recognition/k2/setup.sh || exit 0
 
 # copy nemo source into a scratch image
 FROM scratch as nemo-src
