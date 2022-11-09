@@ -218,6 +218,9 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         """
         key, value, query = self.update_cache(key=key, value=value, query=query, cache=cache, cache_next=cache_next)
 
+        if torch.is_autocast_enabled():
+            query, key, value = query.to(torch.float32), key.to(torch.float32), value.to(torch.float32)
+
         # temporary until we solve this more gracefully
         with avoid_float16_autocast_context():
             q, k, v = self.forward_qkv(query, key, value)
