@@ -90,8 +90,9 @@ python process_asr_text_tokenizer.py \
     --no_lower_case \
     --spe_type="bpe" \
     --tokenizer="spe" \
+    --spe_character_coverage=0.9995 \
     --log \
-    --vocab_size=4096
+    --vocab_size=1024
 
 """
 

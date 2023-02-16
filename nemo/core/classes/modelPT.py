@@ -1129,6 +1129,11 @@ class ModelPT(LightningModule, Model):
             if should_add:
                 dict_to_load[k] = v
 
+        added_keys = set(list(dict_to_load.keys()))
+        state_dict_keys = set(list(self.state_dict().keys()))
+        matched_keys = sorted(list(set.intersection(state_dict_keys, added_keys)))
+        print("Matched Key :", matched_keys)
+
         # Restore checkpoint part into current model
         self.load_state_dict(dict_to_load, strict=False)
         if load_from_string is not None:

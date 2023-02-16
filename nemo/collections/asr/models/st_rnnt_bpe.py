@@ -313,7 +313,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             val_loss_log = {}
 
-        sb_score = self._compute_sacrebleu_score(outputs)
+        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='val')
         tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score}
         return {**val_loss_log, 'log': tensorboard_logs}
 
@@ -330,14 +330,14 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             test_loss_log = {}
 
-        sb_score = self._compute_sacrebleu_score(outputs)
+        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='test')
         tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score}
         return {**test_loss_log, 'log': tensorboard_logs}
 
     def _compute_sacrebleu_score(self, outputs, eval_mode: str = 'val'):
         sb_score = 0.0
         for output in outputs:
-            translations = list(itertools.chain(*[x['translations'] for x in output]))
+            translations = list(itertools.chain(*[x[f'{eval_mode}_translations'] for x in output]))
             ground_truths = list(itertools.chain(*[x['ground_truths'] for x in output]))
 
             # Gather translations and ground truths from all workers
@@ -359,6 +359,9 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
                 sb_score = sacre_bleu.score * self.world_size
+
+                logging.info(f"SB Score : {sb_score}")
+                logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
             else:
                 sb_score = 0.0
 
