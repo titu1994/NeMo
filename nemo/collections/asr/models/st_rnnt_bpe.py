@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import os
 import itertools
 from typing import Dict, List, Optional, Union
 
@@ -23,12 +21,8 @@ from omegaconf import DictConfig, ListConfig, OmegaConf, open_dict
 from pytorch_lightning import Trainer
 from sacrebleu import corpus_bleu
 
-from nemo.collections.asr.data import audio_to_text_dataset
-from nemo.collections.asr.data.audio_to_text_dali import AudioToBPEDALIDataset, DALIOutputs
-from nemo.collections.asr.losses.rnnt import RNNTLoss
-from nemo.collections.asr.metrics.rnnt_wer_bpe import RNNTBPEWER, RNNTBPEDecoding, RNNTBPEDecodingConfig
+from nemo.collections.asr.data.audio_to_text_dali import DALIOutputs
 from nemo.collections.asr.models.rnnt_bpe_models import EncDecRNNTBPEModel
-from nemo.collections.asr.parts.mixins import ASRBPEMixin
 from nemo.core.classes import typecheck
 from nemo.core.classes.mixins import AccessMixin
 from nemo.core.classes.common import PretrainedModelInfo
@@ -52,7 +46,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
     @typecheck()
     def forward(
-            self, input_signal=None, input_signal_length=None, processed_signal=None, processed_signal_length=None
+        self, input_signal=None, input_signal_length=None, processed_signal=None, processed_signal_length=None
     ):
         """
         Forward pass of the model. Note that for RNNT Models, the forward pass of the model is a 3 step process,
@@ -227,15 +221,10 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
         # RNNT Decoding
         best_hyp, all_hyp = self.decoding.rnnt_decoder_predictions_tensor(
-            encoded,
-            encoded_len,
-            return_hypotheses=False,
-            partial_hypotheses=None,
+            encoded, encoded_len, return_hypotheses=False, partial_hypotheses=None,
         )
 
-        ground_truths = [
-            self.tokenizer.ids_to_text(sent) for sent in transcript.detach().cpu().tolist()
-        ]
+        ground_truths = [self.tokenizer.ids_to_text(sent) for sent in transcript.detach().cpu().tolist()]
         translations = best_hyp
         tensorboard_logs.update({'val_translations': translations, 'ground_truths': ground_truths})
 
@@ -320,235 +309,6 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             # self.log(f"{eval_mode}_sacreBLEU", sb_score, sync_dist=True)
 
         return sb_score
-
-    # def change_vocabulary(
-    #     self,
-    #     new_tokenizer_dir: Union[str, DictConfig],
-    #     new_tokenizer_type: str,
-    #     decoding_cfg: Optional[DictConfig] = None,
-    # ):
-    #     """
-    #     Changes vocabulary used during RNNT decoding process. Use this method when fine-tuning on from pre-trained model.
-    #     This method changes only decoder and leaves encoder and pre-processing modules unchanged. For example, you would
-    #     use it if you want to use pretrained encoder when fine-tuning on data in another language, or when you'd need
-    #     model to learn capitalization, punctuation and/or special characters.
-    #
-    #     Args:
-    #         new_tokenizer_dir: Directory path to tokenizer or a config for a new tokenizer (if the tokenizer type is `agg`)
-    #         new_tokenizer_type: Type of tokenizer. Can be either `agg`, `bpe` or `wpe`.
-    #         decoding_cfg: A config for the decoder, which is optional. If the decoding type
-    #             needs to be changed (from say Greedy to Beam decoding etc), the config can be passed here.
-    #
-    #     Returns: None
-    #
-    #     """
-    #     if isinstance(new_tokenizer_dir, DictConfig):
-    #         if new_tokenizer_type == 'agg':
-    #             new_tokenizer_cfg = new_tokenizer_dir
-    #         else:
-    #             raise ValueError(
-    #                 f'New tokenizer dir should be a string unless the tokenizer is `agg`, but this tokenizer type is: {new_tokenizer_type}'
-    #             )
-    #     else:
-    #         new_tokenizer_cfg = None
-    #
-    #     if new_tokenizer_cfg is not None:
-    #         tokenizer_cfg = new_tokenizer_cfg
-    #     else:
-    #         if not os.path.isdir(new_tokenizer_dir):
-    #             raise NotADirectoryError(
-    #                 f'New tokenizer dir must be non-empty path to a directory. But I got: {new_tokenizer_dir}'
-    #             )
-    #
-    #         if new_tokenizer_type.lower() not in ('bpe', 'wpe'):
-    #             raise ValueError(f'New tokenizer type must be either `bpe` or `wpe`')
-    #
-    #         tokenizer_cfg = OmegaConf.create({'dir': new_tokenizer_dir, 'type': new_tokenizer_type})
-    #
-    #     # Setup the tokenizer
-    #     self._setup_tokenizer(tokenizer_cfg)
-    #
-    #     # Initialize a dummy vocabulary
-    #     vocabulary = self.tokenizer.tokenizer.get_vocab()
-    #
-    #     joint_config = self.joint.to_config_dict()
-    #     new_joint_config = copy.deepcopy(joint_config)
-    #     if self.tokenizer_type == "agg":
-    #         new_joint_config["vocabulary"] = ListConfig(vocabulary)
-    #     else:
-    #         new_joint_config["vocabulary"] = ListConfig(list(vocabulary.keys()))
-    #
-    #     new_joint_config['num_classes'] = len(vocabulary)
-    #     del self.joint
-    #     self.joint = EncDecRNNTBPEModel.from_config_dict(new_joint_config)
-    #
-    #     decoder_config = self.decoder.to_config_dict()
-    #     new_decoder_config = copy.deepcopy(decoder_config)
-    #     new_decoder_config.vocab_size = len(vocabulary)
-    #     del self.decoder
-    #     self.decoder = EncDecRNNTBPEModel.from_config_dict(new_decoder_config)
-    #
-    #     del self.loss
-    #     self.loss = RNNTLoss(num_classes=self.joint.num_classes_with_blank - 1)
-    #
-    #     if decoding_cfg is None:
-    #         # Assume same decoding config as before
-    #         decoding_cfg = self.cfg.decoding
-    #
-    #     # Assert the decoding config with all hyper parameters
-    #     decoding_cls = OmegaConf.structured(RNNTBPEDecodingConfig)
-    #     decoding_cls = OmegaConf.create(OmegaConf.to_container(decoding_cls))
-    #     decoding_cfg = OmegaConf.merge(decoding_cls, decoding_cfg)
-    #
-    #     self.decoding = RNNTBPEDecoding(
-    #         decoding_cfg=decoding_cfg, decoder=self.decoder, joint=self.joint, tokenizer=self.tokenizer,
-    #     )
-    #
-    #     self.wer = RNNTBPEWER(
-    #         decoding=self.decoding,
-    #         batch_dim_index=self.wer.batch_dim_index,
-    #         use_cer=self.wer.use_cer,
-    #         log_prediction=self.wer.log_prediction,
-    #         dist_sync_on_step=True,
-    #     )
-    #
-    #     # Setup fused Joint step
-    #     if self.joint.fuse_loss_wer or (
-    #         self.decoding.joint_fused_batch_size is not None and self.decoding.joint_fused_batch_size > 0
-    #     ):
-    #         self.joint.set_loss(self.loss)
-    #         self.joint.set_wer(self.wer)
-    #
-    #     # Update config
-    #     with open_dict(self.cfg.joint):
-    #         self.cfg.joint = new_joint_config
-    #
-    #     with open_dict(self.cfg.decoder):
-    #         self.cfg.decoder = new_decoder_config
-    #
-    #     with open_dict(self.cfg.decoding):
-    #         self.cfg.decoding = decoding_cfg
-    #
-    #     logging.info(f"Changed decoder to output to {self.joint.vocabulary} vocabulary.")
-    #
-    # def change_decoding_strategy(self, decoding_cfg: DictConfig):
-    #     """
-    #     Changes decoding strategy used during RNNT decoding process.
-    #
-    #     Args:
-    #         decoding_cfg: A config for the decoder, which is optional. If the decoding type
-    #             needs to be changed (from say Greedy to Beam decoding etc), the config can be passed here.
-    #     """
-    #     if decoding_cfg is None:
-    #         # Assume same decoding config as before
-    #         logging.info("No `decoding_cfg` passed when changing decoding strategy, using internal config")
-    #         decoding_cfg = self.cfg.decoding
-    #
-    #     # Assert the decoding config with all hyper parameters
-    #     decoding_cls = OmegaConf.structured(RNNTBPEDecodingConfig)
-    #     decoding_cls = OmegaConf.create(OmegaConf.to_container(decoding_cls))
-    #     decoding_cfg = OmegaConf.merge(decoding_cls, decoding_cfg)
-    #
-    #     self.decoding = RNNTBPEDecoding(
-    #         decoding_cfg=decoding_cfg, decoder=self.decoder, joint=self.joint, tokenizer=self.tokenizer,
-    #     )
-    #
-    #     self.wer = RNNTBPEWER(
-    #         decoding=self.decoding,
-    #         batch_dim_index=self.wer.batch_dim_index,
-    #         use_cer=self.wer.use_cer,
-    #         log_prediction=self.wer.log_prediction,
-    #         dist_sync_on_step=True,
-    #     )
-    #
-    #     # Setup fused Joint step
-    #     if self.joint.fuse_loss_wer or (
-    #         self.decoding.joint_fused_batch_size is not None and self.decoding.joint_fused_batch_size > 0
-    #     ):
-    #         self.joint.set_loss(self.loss)
-    #         self.joint.set_wer(self.wer)
-    #
-    #     # Update config
-    #     with open_dict(self.cfg.decoding):
-    #         self.cfg.decoding = decoding_cfg
-    #
-    #     logging.info(f"Changed decoding strategy to \n{OmegaConf.to_yaml(self.cfg.decoding)}")
-
-    # def _setup_dataloader_from_config(self, config: Optional[Dict]):
-    #     dataset = audio_to_text_dataset.get_audio_to_text_bpe_dataset_from_config(
-    #         config=config,
-    #         local_rank=self.local_rank,
-    #         global_rank=self.global_rank,
-    #         world_size=self.world_size,
-    #         tokenizer=self.tokenizer,
-    #         preprocessor_cfg=self.cfg.get("preprocessor", None),
-    #     )
-    #
-    #     if dataset is None:
-    #         return None
-    #
-    #     if isinstance(dataset, AudioToBPEDALIDataset):
-    #         # DALI Dataset implements dataloader interface
-    #         return dataset
-    #
-    #     shuffle = config['shuffle']
-    #     if config.get('is_tarred', False):
-    #         shuffle = False
-    #
-    #     if hasattr(dataset, 'collate_fn'):
-    #         collate_fn = dataset.collate_fn
-    #     else:
-    #         collate_fn = dataset.datasets[0].collate_fn
-    #
-    #     return torch.utils.data.DataLoader(
-    #         dataset=dataset,
-    #         batch_size=config['batch_size'],
-    #         collate_fn=collate_fn,
-    #         drop_last=config.get('drop_last', False),
-    #         shuffle=shuffle,
-    #         num_workers=config.get('num_workers', 0),
-    #         pin_memory=config.get('pin_memory', False),
-    #     )
-
-    # def _setup_transcribe_dataloader(self, config: Dict) -> 'torch.utils.data.DataLoader':
-    #     """
-    #     Setup function for a temporary data loader which wraps the provided audio file.
-    #
-    #     Args:
-    #         config: A python dictionary which contains the following keys:
-    #         paths2audio_files: (a list) of paths to audio files. The files should be relatively short fragments. \
-    #             Recommended length per file is between 5 and 25 seconds.
-    #         batch_size: (int) batch size to use during inference. \
-    #             Bigger will result in better throughput performance but would use more memory.
-    #         temp_dir: (str) A temporary directory where the audio manifest is temporarily
-    #             stored.
-    #
-    #     Returns:
-    #         A pytorch DataLoader for the given audio file(s).
-    #     """
-    #     if 'manifest_filepath' in config:
-    #         manifest_filepath = config['manifest_filepath']
-    #         batch_size = config['batch_size']
-    #     else:
-    #         manifest_filepath = os.path.join(config['temp_dir'], 'manifest.json')
-    #         batch_size = min(config['batch_size'], len(config['paths2audio_files']))
-    #
-    #     dl_config = {
-    #         'manifest_filepath': manifest_filepath,
-    #         'sample_rate': self.preprocessor._sample_rate,
-    #         'batch_size': batch_size,
-    #         'shuffle': False,
-    #         'num_workers': config.get('num_workers', min(batch_size, os.cpu_count() - 1)),
-    #         'pin_memory': True,
-    #         'channel_selector': config.get('channel_selector', None),
-    #         'use_start_end_token': self.cfg.validation_ds.get('use_start_end_token', False),
-    #     }
-    #
-    #     if config.get("augmentor"):
-    #         dl_config['augmentor'] = config.get("augmentor")
-    #
-    #     temporary_datalayer = self._setup_dataloader_from_config(config=DictConfig(dl_config))
-    #     return temporary_datalayer
 
     @classmethod
     def list_available_models(cls) -> List[PretrainedModelInfo]:
