@@ -243,36 +243,6 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
         return tensorboard_logs
 
-    def setup_inference_decoding_strategy(self, decoding_cfg: DictConfig = None):
-        with open_dict(self.cfg):
-            self.cfg.original_decoding = copy.deepcopy(self.cfg.decoding)
-
-        if decoding_cfg is None:
-            decoding_cfg = self.cfg.decoding
-
-        with open_dict(decoding_cfg):
-            decoding_cfg.strategy = "maes"
-            decoding_cfg.beam.beam_size = 4
-            decoding_cfg.beam.maes_num_steps = 3
-
-        self.change_decoding_strategy(decoding_cfg)
-        self.wer.to(self.device)
-
-    def on_validation_start(self) -> None:
-        super().on_validation_start()
-
-        self.setup_inference_decoding_strategy(None)
-
-    def on_validation_end(self) -> None:
-        super().on_validation_end()
-
-        if 'original_decoding' in self.cfg:
-            self.change_decoding_strategy(self.cfg.original_decoding)
-        else:
-            self.change_decoding_strategy(self.cfg.decoding)
-
-        self.wer.to(self.device)
-
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         logs = self.validation_step(batch, batch_idx, dataloader_idx=dataloader_idx)
         test_logs = {
@@ -281,21 +251,6 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         if 'val_loss' in logs:
             test_logs['test_loss'] = logs['val_loss']
         return test_logs
-
-    # def on_test_start(self) -> None:
-    #     super().on_test_start()
-    #
-    #     self.setup_inference_decoding_strategy(None)
-    #
-    # def on_test_end(self) -> None:
-    #     super().on_test_end()
-    #
-    #     if 'original_decoding' in self.cfg:
-    #         self.change_decoding_strategy(self.cfg.original_decoding)
-    #     else:
-    #         self.change_decoding_strategy(self.cfg.decoding)
-    #
-    #     self.wer.to(self.device)
 
     def multi_validation_epoch_end(self, outputs, dataloader_idx: int = 0):
         if not outputs:
