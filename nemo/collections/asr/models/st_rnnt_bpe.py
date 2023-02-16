@@ -196,22 +196,22 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
         return {'loss': loss_value}
 
-    # def predict_step(self, batch, batch_idx, dataloader_idx=0):
-    #     signal, signal_len, transcript, transcript_len, sample_id = batch
-    #
-    #     # forward() only performs encoder forward
-    #     if isinstance(batch, DALIOutputs) and batch.has_processed_signal:
-    #         encoded, encoded_len = self.forward(processed_signal=signal, processed_signal_length=signal_len)
-    #     else:
-    #         encoded, encoded_len = self.forward(input_signal=signal, input_signal_length=signal_len)
-    #     del signal
-    #
-    #     best_hyp_text, all_hyp_text = self.decoding.rnnt_decoder_predictions_tensor(
-    #         encoder_output=encoded, encoded_lengths=encoded_len, return_hypotheses=False
-    #     )
-    #
-    #     sample_id = sample_id.cpu().detach().numpy()
-    #     return list(zip(sample_id, best_hyp_text))
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        signal, signal_len, transcript, transcript_len, sample_id = batch
+
+        # forward() only performs encoder forward
+        if isinstance(batch, DALIOutputs) and batch.has_processed_signal:
+            encoded, encoded_len = self.forward(processed_signal=signal, processed_signal_length=signal_len)
+        else:
+            encoded, encoded_len = self.forward(input_signal=signal, input_signal_length=signal_len)
+        del signal
+
+        best_hyp_text, all_hyp_text = self.decoding.rnnt_decoder_predictions_tensor(
+            encoder_output=encoded, encoded_lengths=encoded_len, return_hypotheses=False
+        )
+
+        sample_id = sample_id.cpu().detach().numpy()
+        return list(zip(sample_id, best_hyp_text))
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         signal, signal_len, transcript, transcript_len = batch
@@ -237,59 +237,41 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             self.tokenizer.ids_to_text(sent) for sent in transcript.detach().cpu().tolist()
         ]
         translations = best_hyp
-
         tensorboard_logs.update({'val_translations': translations, 'ground_truths': ground_truths})
-
-        # # If experimental fused Joint-Loss-WER is not used
-        # if not self.joint.fuse_loss_wer:
-        #     if self.compute_eval_loss:
-        #         decoder, target_length, states = self.decoder(targets=transcript, target_length=transcript_len)
-        #         joint = self.joint(encoder_outputs=encoded, decoder_outputs=decoder)
-        #
-        #         loss_value = self.loss(
-        #             log_probs=joint, targets=transcript, input_lengths=encoded_len, target_lengths=target_length
-        #         )
-        #
-        #         tensorboard_logs['val_loss'] = loss_value
-        #
-        #     self.wer.update(encoded, encoded_len, transcript, transcript_len)
-        #     wer, wer_num, wer_denom = self.wer.compute()
-        #     self.wer.reset()
-        #
-        #     tensorboard_logs['val_wer_num'] = wer_num
-        #     tensorboard_logs['val_wer_denom'] = wer_denom
-        #     tensorboard_logs['val_wer'] = wer
-        #
-        # else:
-        #     # If experimental fused Joint-Loss-WER is used
-        #     compute_wer = True
-        #
-        #     if self.compute_eval_loss:
-        #         decoded, target_len, states = self.decoder(targets=transcript, target_length=transcript_len)
-        #     else:
-        #         decoded = None
-        #         target_len = transcript_len
-        #
-        #     # Fused joint step
-        #     loss_value, wer, wer_num, wer_denom = self.joint(
-        #         encoder_outputs=encoded,
-        #         decoder_outputs=decoded,
-        #         encoder_lengths=encoded_len,
-        #         transcripts=transcript,
-        #         transcript_lengths=target_len,
-        #         compute_wer=compute_wer,
-        #     )
-        #
-        #     if loss_value is not None:
-        #         tensorboard_logs['val_loss'] = loss_value
-        #
-        #     tensorboard_logs['val_wer_num'] = wer_num
-        #     tensorboard_logs['val_wer_denom'] = wer_denom
-        #     tensorboard_logs['val_wer'] = wer
 
         self.log('global_step', torch.tensor(self.trainer.global_step, dtype=torch.float32))
 
         return tensorboard_logs
+
+    def setup_inference_decoding_strategy(self, decoding_cfg: DictConfig = None):
+        with open_dict(self.cfg):
+            self.cfg.original_decoding = copy.deepcopy(self.cfg.decoding)
+
+        if decoding_cfg is None:
+            decoding_cfg = self.cfg.decoding
+
+        with open_dict(decoding_cfg):
+            decoding_cfg.strategy = "maes"
+            decoding_cfg.beam.beam_size = 4
+            decoding_cfg.beam.maes_num_steps = 3
+
+        self.change_decoding_strategy(decoding_cfg)
+        self.wer.to(self.device)
+
+    def on_validation_start(self) -> None:
+        super().on_validation_start()
+
+        self.setup_inference_decoding_strategy(None)
+
+    def on_validation_end(self) -> None:
+        super().on_validation_end()
+
+        if 'original_decoding' in self.cfg:
+            self.change_decoding_strategy(self.cfg.original_decoding)
+        else:
+            self.change_decoding_strategy(self.cfg.decoding)
+
+        self.wer.to(self.device)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         logs = self.validation_step(batch, batch_idx, dataloader_idx=dataloader_idx)
@@ -299,6 +281,21 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         if 'val_loss' in logs:
             test_logs['test_loss'] = logs['val_loss']
         return test_logs
+
+    # def on_test_start(self) -> None:
+    #     super().on_test_start()
+    #
+    #     self.setup_inference_decoding_strategy(None)
+    #
+    # def on_test_end(self) -> None:
+    #     super().on_test_end()
+    #
+    #     if 'original_decoding' in self.cfg:
+    #         self.change_decoding_strategy(self.cfg.original_decoding)
+    #     else:
+    #         self.change_decoding_strategy(self.cfg.decoding)
+    #
+    #     self.wer.to(self.device)
 
     def multi_validation_epoch_end(self, outputs, dataloader_idx: int = 0):
         if not outputs:
