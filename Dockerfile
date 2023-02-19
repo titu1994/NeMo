@@ -59,8 +59,8 @@ COPY nemo_text_processing/install_pynini.sh /tmp/nemo/
 RUN /bin/bash /tmp/nemo/install_pynini.sh
 
 # install k2, skip if installation fails
-COPY scripts /tmp/nemo/scripts/
-RUN /bin/bash /tmp/nemo/scripts/speech_recognition/k2/setup.sh || exit 0
+# COPY scripts /tmp/nemo/scripts/
+# RUN /bin/bash /tmp/nemo/scripts/speech_recognition/k2/setup.sh || exit 0
 
 # copy nemo source into a scratch image
 FROM scratch as nemo-src
