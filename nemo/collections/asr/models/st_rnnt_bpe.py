@@ -142,18 +142,20 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 'global_step': torch.tensor(self.trainer.global_step, dtype=torch.float32),
             }
 
-            if (sample_id + 1) % log_every_n_steps == 0:
-                self.wer.update(encoded, encoded_len, transcript, transcript_len)
-                _, scores, words = self.wer.compute()
-                self.wer.reset()
-                tensorboard_logs.update({'training_batch_wer': scores.float() / words})
+            # if (sample_id + 1) % log_every_n_steps == 0:
+            #     self.wer.update(encoded, encoded_len, transcript, transcript_len)
+            #     _, scores, words = self.wer.compute()
+            #     self.wer.reset()
+            #     tensorboard_logs.update({'training_batch_wer': scores.float() / words})
 
         else:
             # If experimental fused Joint-Loss-WER is used
-            if (sample_id + 1) % log_every_n_steps == 0:
-                compute_wer = True
-            else:
-                compute_wer = False
+            # if (sample_id + 1) % log_every_n_steps == 0:
+            #     compute_wer = True
+            # else:
+            #     compute_wer = False
+
+            compute_wer = False
 
             # Fused joint step
             loss_value, wer, _, _ = self.joint(
@@ -299,7 +301,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                     _ground_truths += [g for (t, g) in tr_and_gt[rank]]
 
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
-                sb_score = sacre_bleu.score * self.world_size
+                sb_score = sacre_bleu.score # * self.world_size
 
                 logging.info(f"SB Score : {sb_score}")
                 logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
