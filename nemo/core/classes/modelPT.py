@@ -938,7 +938,7 @@ class ModelPT(LightningModule, Model):
                         output_dict[new_k] = v
 
             if 'log' in output_dict:
-                self.log_dict(output_dict.pop('log'), on_epoch=True)
+                self.log_dict(output_dict.pop('log'), on_epoch=True, sync_dist=True)
 
             # return everything else
             return output_dict
@@ -1031,7 +1031,7 @@ class ModelPT(LightningModule, Model):
                         output_dict[new_k] = v
 
             if 'log' in output_dict:
-                self.log_dict(output_dict.pop('log'), on_epoch=True)
+                self.log_dict(output_dict.pop('log'), on_epoch=True, sync_dist=True)
 
             # return everything else
             return output_dict
