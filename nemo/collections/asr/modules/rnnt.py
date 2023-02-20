@@ -1704,7 +1704,7 @@ class SampledRNNTJoint(RNNTJoint):
     ) -> Union[torch.Tensor, List[Optional[torch.Tensor]]]:
         # If in inference mode, revert to basic RNNT Joint behaviour.
         # Sampled RNNT is only used for training.
-        if not torch.is_grad_enabled() or torch.is_inference_mode_enabled():
+        if not torch.is_grad_enabled() or torch.is_inference_mode_enabled() or self.n_samples < 0:
             # Simply call full tensor joint
             return super().forward(
                 encoder_outputs=encoder_outputs,

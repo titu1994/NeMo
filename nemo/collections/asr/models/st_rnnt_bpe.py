@@ -301,7 +301,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                     _ground_truths += [g for (t, g) in tr_and_gt[rank]]
 
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
-                sb_score = sacre_bleu.score # * self.world_size
+                sb_score = sacre_bleu.score  # * self.world_size
 
                 logging.info(f"SB Score : {sb_score}")
                 logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
