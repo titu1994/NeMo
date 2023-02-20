@@ -880,7 +880,7 @@ class ModelPT(LightningModule, Model):
             output_dict = self.multi_validation_epoch_end(outputs, dataloader_idx=0)
 
             if output_dict is not None and 'log' in output_dict:
-                self.log_dict(output_dict.pop('log'), on_epoch=True)
+                self.log_dict(output_dict.pop('log'), on_epoch=True, sync_dist=True)
 
             return output_dict
 
@@ -975,7 +975,7 @@ class ModelPT(LightningModule, Model):
             output_dict = self.multi_test_epoch_end(outputs, dataloader_idx=0)
 
             if output_dict is not None and 'log' in output_dict:
-                self.log_dict(output_dict.pop('log'), on_epoch=True)
+                self.log_dict(output_dict.pop('log'), on_epoch=True, sync_dist=True)
 
             return output_dict
 
