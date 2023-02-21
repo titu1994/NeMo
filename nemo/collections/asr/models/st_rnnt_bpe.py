@@ -230,6 +230,11 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         translations = best_hyp
         tensorboard_logs.update({'val_translations': translations, 'ground_truths': ground_truths})
 
+        if self.global_rank == 0:
+            logging.info("-" * 80)
+            logging.info(f"Ground Truth: {ground_truths[0]}")
+            logging.info(f"Translation : {translations[0]}")
+
         self.log('global_step', torch.tensor(self.trainer.global_step, dtype=torch.float32))
 
         return tensorboard_logs
