@@ -1502,14 +1502,14 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
 
         if self.attn_pooling_type == 'attn':
             enc_scores = torch.softmax(self.attn_pool_enc(f_enc), dim=-1)  # [B, T, 1, H]
-            enc_scores = torch.mul(f_enc, enc_scores).sum(-1)  # [B, T, 1, 1]
+            enc_scores = torch.mul(f_enc, enc_scores).sum(-1, keepdim=True)  # [B, T, 1, 1]
             enc_scores = self.attn_pool_activation(enc_scores)  # [B, T, 1, 1]
 
         elif self.attn_pooling_type == 'qkv_attn':
             enc_scores_qk = torch.mul(self.attn_pool_enc_q(f_enc), self.attn_pool_enc_k(f_enc)) # [B, T, 1, H]
             enc_scores_qk = torch.softmax(enc_scores_qk, dim=-1)  # [B, T, 1, H]
             enc_scores_v = self.attn_pool_enc_v(f_enc)  # [B, T, 1, H]
-            enc_scores = torch.mul(enc_scores_qk, enc_scores_v).sum(-1)  # [B, T, 1, 1]
+            enc_scores = torch.mul(enc_scores_qk, enc_scores_v).sum(-1, keepdim=True)  # [B, T, 1, 1]
             enc_scores = self.attn_pool_activation(enc_scores)  # [B, T, 1, 1]
 
         else:
@@ -1534,14 +1534,14 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
 
         if self.attn_pooling_type == 'attn':
             dec_scores = torch.softmax(self.attn_pool_pred(g_dec), dim=-1)  # [B, 1, U, H]
-            dec_scores = torch.mul(g_dec, dec_scores).sum(-1)  # [B, 1, U, 1]
+            dec_scores = torch.mul(g_dec, dec_scores).sum(-1, keepdim=True)  # [B, 1, U, 1]
             dec_scores = self.attn_pool_activation(dec_scores)  # [B, 1, U, 1]
 
         elif self.attn_pooling_type == 'qkv_attn':
             dec_scores_qk = torch.mul(self.attn_pool_pred_q(g_dec), self.attn_pool_pred_k(g_dec))  # [B, 1, U, H]
             dec_scores_qk = torch.softmax(dec_scores_qk, dim=-1)  # [B, 1, U, H]
             dec_scores_v = self.attn_pool_pred_v(g_dec)  # [B, 1, U, H]
-            dec_scores = torch.mul(dec_scores_qk, dec_scores_v).sum(-1)  # [B, 1, U, 1]
+            dec_scores = torch.mul(dec_scores_qk, dec_scores_v).sum(-1, keepdim=True)  # [B, 1, U, 1]
             dec_scores = self.attn_pool_activation(dec_scores)  # [B, 1, U, 1]
 
         else:
