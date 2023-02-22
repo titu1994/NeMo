@@ -1117,6 +1117,20 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
 
         fused_batch_size: Optional int, required if `fuse_loss_wer` flag is set. Determines the size of the
             sub-batches. Should be any value below the actual batch size per GPU.
+
+        attn_pooling: Optional dict-like object, set to None by default. If set as None, will not use attention pooling.
+            Con contain the following key-value pairs
+            Reference - [Large-Scale Streaming End-to-End Speech Translation with Neural Transducers](https://arxiv.org/abs/2204.05352)
+
+            type: Can take possible values of ['attn', 'qkv_attn'].
+                'attn' - uses attention pooling with a shared parameters for Query Key and Value projections.
+                'qkv_attn' - uses attention pooling with separate parameters for Query Key and Value projections.
+
+            activation: Activation function used in the attention pooling step. Can be one of
+                ['relu', 'tanh', 'sigmoid'].
+
+            project_scores: Optional bool, set to False by default. If set to True, will project the scores from a
+                scalar value (per t, u) to the hidden dimension of the joint.
     """
 
     @property
@@ -1180,6 +1194,7 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
         preserve_memory: bool = False,
         fuse_loss_wer: bool = False,
         fused_batch_size: Optional[int] = None,
+        attn_pooling: Optional[dict] = None,
         experimental_fuse_loss_wer: Any = None,
     ):
         super().__init__()
@@ -1231,6 +1246,27 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
             activation=self.activation,
             dropout=dropout,
         )
+
+        # Setup attention pooling
+        valid_attn_pooling = ['attn', 'qkv_attn']
+        self.attn_pooling = attn_pooling
+        if self.attn_pooling is not None:
+            if self.attn_pooling['type'] not in valid_attn_pooling:
+                raise ValueError(
+                    f"Invalid value for `attn_pooling.type`: {self.attn_pooling}. "
+                    f"Valid values are: {valid_attn_pooling}"
+                )
+
+            self.attn_pooling_type = self.attn_pooling['type']
+            self.attn_pooling_act_name = self.attn_pooling['activation']
+
+            self._setup_attention_pooling(
+                attn_pooling=self.attn_pooling,
+                joint_n_hidden=self.joint_hidden,
+                activation=self.attn_pooling_act_name,
+            )
+        else:
+            self.attn_pooling_type = None
 
         # Flag needed for RNNT export support
         self._rnnt_export = False
@@ -1412,7 +1448,19 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
         g = self.pred(g)
         g.unsqueeze_(dim=1)  # (B, 1, U, H)
 
+        # Compute joint hidden
         inp = f + g  # [B, T, U, H]
+
+        # Compute attention pooling if available
+        if self.attn_pooling is not None:
+            f_scores = self.forward_attn_pooling_encoder(f)
+            g_scores = self.forward_attn_pooling_decoder(g)
+            joint_scores = self.attn_pool_projection(torch.mul(f_scores, g_scores))
+
+            # Add joint scores to joint hidden
+            inp = inp + joint_scores
+
+            del f_scores, g_scores, joint_scores
 
         del f, g
 
@@ -1436,6 +1484,70 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
                 res = res.log_softmax(dim=-1)
 
         return res
+
+    def forward_attn_pooling_encoder(self, f_enc: torch.Tensor) -> torch.Tensor:
+        """
+        Forward the encoder through the attention pooling layer.
+
+        Args:
+            f_enc: Output of the Encoder model. A torch.Tensor of shape [B, T, 1, H]. Here H is hidden dim of joint.
+
+        Returns:
+            Output of the attention pooling layer for encoder. A torch.Tensor of shape [B, T, 1, 1]
+        """
+        if self.attn_pooling is None:
+            return f_enc
+
+        # f_enc = [B, T, 1, H]
+
+        if self.attn_pooling_type == 'attn':
+            enc_scores = torch.softmax(self.attn_pool_enc(f_enc), dim=-1)  # [B, T, 1, H]
+            enc_scores = torch.mul(f_enc, enc_scores).sum(-1)  # [B, T, 1, 1]
+            enc_scores = self.attn_pool_activation(enc_scores)  # [B, T, 1, 1]
+
+        elif self.attn_pooling_type == 'qkv_attn':
+            enc_scores_qk = torch.mul(self.attn_pool_enc_q(f_enc), self.attn_pool_enc_k(f_enc)) # [B, T, 1, H]
+            enc_scores_qk = torch.softmax(enc_scores_qk, dim=-1)  # [B, T, 1, H]
+            enc_scores_v = self.attn_pool_enc_v(f_enc)  # [B, T, 1, H]
+            enc_scores = torch.mul(enc_scores_qk, enc_scores_v).sum(-1)  # [B, T, 1, 1]
+            enc_scores = self.attn_pool_activation(enc_scores)  # [B, T, 1, 1]
+
+        else:
+            raise ValueError(f"Unsupported attention pooling type - {self.attn_pooling}")
+
+        return enc_scores
+
+    def forward_attn_pooling_decoder(self, g_dec: torch.Tensor) -> torch.Tensor:
+        """
+        Forward the decoder through the attention pooling layer.
+
+        Args:
+            g_dec: Output of the Decoder model. A torch.Tensor of shape [B, 1, U, H]. Here H is hidden dim of joint.
+
+        Returns:
+            Output of the attention pooling layer for encoder. A torch.Tensor of shape [B, 1, U, 1]
+        """
+        if self.attn_pooling is None:
+            return g_dec
+
+        # g_dec = [B, T, 1, H]
+
+        if self.attn_pooling_type == 'attn':
+            dec_scores = torch.softmax(self.attn_pool_pred(g_dec), dim=-1)  # [B, 1, U, H]
+            dec_scores = torch.mul(g_dec, dec_scores).sum(-1)  # [B, 1, U, 1]
+            dec_scores = self.attn_pool_activation(dec_scores)  # [B, 1, U, 1]
+
+        elif self.attn_pooling_type == 'qkv_attn':
+            dec_scores_qk = torch.mul(self.attn_pool_pred_q(g_dec), self.attn_pool_pred_k(g_dec))  # [B, 1, U, H]
+            dec_scores_qk = torch.softmax(dec_scores_qk, dim=-1)  # [B, 1, U, H]
+            dec_scores_v = self.attn_pool_pred_v(g_dec)  # [B, 1, U, H]
+            dec_scores = torch.mul(dec_scores_qk, dec_scores_v).sum(-1)  # [B, 1, U, 1]
+            dec_scores = self.attn_pool_activation(dec_scores)  # [B, 1, U, 1]
+
+        else:
+            raise ValueError(f"Unsupported attention pooling type - {self.attn_pooling}")
+
+        return dec_scores
 
     def _joint_net_modules(self, num_classes, pred_n_hidden, enc_n_hidden, joint_n_hidden, activation, dropout):
         """
@@ -1470,6 +1582,54 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
             + [torch.nn.Linear(joint_n_hidden, num_classes)]
         )
         return pred, enc, torch.nn.Sequential(*layers)
+
+    def _setup_attention_pooling(
+        self, attn_pooling: dict, joint_n_hidden, activation,
+    ):
+        """
+        Setup the attention pooling module.
+
+        Args:
+            attn_pooling: Optional str.
+            joint_n_hidden: Hidden size of the joint network.
+            activation: Activation of the joint. Can be one of [relu, tanh, sigmoid]
+        """
+        if attn_pooling is None:
+            return None
+
+        if attn_pooling['type'] == 'attn':
+            self.attn_pool_enc = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+            self.attn_pool_pred = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+
+        elif attn_pooling['type'] == 'qkv_attn':
+            self.attn_pool_enc_q = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+            self.attn_pool_enc_v = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+            self.attn_pool_enc_v = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+
+            self.attn_pool_pred_q = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+            self.attn_pool_pred_v = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+            self.attn_pool_pred_v = torch.nn.Linear(joint_n_hidden, joint_n_hidden, bias=False)
+
+        else:
+            raise ValueError(f"Unsupported attention pooling type {attn_pooling}.")
+
+        if activation not in ['relu', 'sigmoid', 'tanh']:
+            raise ValueError("Unsupported activation for joint step - please pass one of [relu, sigmoid, tanh]")
+
+        activation = activation.lower()
+
+        if activation == 'relu':
+            activation = torch.nn.ReLU(inplace=True)
+        elif activation == 'sigmoid':
+            activation = torch.nn.Sigmoid()
+        elif activation == 'tanh':
+            activation = torch.nn.Tanh()
+        self.attn_pool_activation = activation
+
+        if attn_pooling.get('project_scores', False):
+            self.attn_pool_projection = torch.nn.Linear(1, joint_n_hidden, bias=False)
+        else:
+            self.attn_pool_projection = torch.nn.Identity()
 
     # Adapter method overrides
     def add_adapter(self, name: str, cfg: DictConfig):
@@ -1667,6 +1827,20 @@ class SampledRNNTJoint(RNNTJoint):
 
         fused_batch_size: Optional int, required if `fuse_loss_wer` flag is set. Determines the size of the
             sub-batches. Should be any value below the actual batch size per GPU.
+
+        attn_pooling: Optional dict-like object, set to None by default. If set as None, will not use attention pooling.
+            Con contain the following key-value pairs
+            Reference - [Large-Scale Streaming End-to-End Speech Translation with Neural Transducers](https://arxiv.org/abs/2204.05352)
+
+            type: Can take possible values of ['attn', 'qkv_attn'].
+                'attn' - uses attention pooling with a shared parameters for Query Key and Value projections.
+                'qkv_attn' - uses attention pooling with separate parameters for Query Key and Value projections.
+
+            activation: Activation function used in the attention pooling step. Can be one of
+                ['relu', 'tanh', 'sigmoid'].
+
+            project_scores: Optional bool, set to False by default. If set to True, will project the scores from a
+                scalar value (per t, u) to the hidden dimension of the joint.
     """
 
     def __init__(
@@ -1678,6 +1852,7 @@ class SampledRNNTJoint(RNNTJoint):
         log_softmax: Optional[bool] = None,
         preserve_memory: bool = False,
         fuse_loss_wer: bool = False,
+        attn_pooling: Optional[dict] = None,
         fused_batch_size: Optional[int] = None,
     ):
         super().__init__(
@@ -1688,6 +1863,7 @@ class SampledRNNTJoint(RNNTJoint):
             preserve_memory=preserve_memory,
             fuse_loss_wer=fuse_loss_wer,
             fused_batch_size=fused_batch_size,
+            attn_pooling=attn_pooling,
         )
         self.n_samples = n_samples
         self.register_buffer('blank_id', torch.tensor([self.num_classes_with_blank - 1]), persistent=False)
@@ -1909,7 +2085,19 @@ class SampledRNNTJoint(RNNTJoint):
         g = self.pred(g)
         g.unsqueeze_(dim=1)  # (B, 1, U, H)
 
+        # Compute joint hidden
         inp = f + g  # [B, T, U, H]
+
+        # Compute attention pooling if available
+        if self.attn_pooling is not None:
+            f_scores = self.forward_attn_pooling_encoder(f)
+            g_scores = self.forward_attn_pooling_decoder(g)
+            joint_scores = self.attn_pool_projection(torch.mul(f_scores, g_scores))
+
+            # Add joint scores to joint hidden
+            inp = inp + joint_scores
+
+            del f_scores, g_scores, joint_scores
 
         del f, g
 
