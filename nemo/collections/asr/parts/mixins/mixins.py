@@ -168,7 +168,13 @@ class ASRBPEMixin(ABC):
             )
         else:
             # This is a YouTokenToMe BPE Tokenizer
-            self.tokenizer = tokenizers.YouTokenToMeTokenizer(model_path=self.tokenizer_cfg.get('model_path'))
+            if 'model_path' in self.tokenizer_cfg:
+                model_path = self.register_artifact('tokenizer.model_path', self.tokenizer_cfg.get('model_path'))
+            else:
+                # search for model path in directory
+                model_path = os.path.join(self.tokenizer_dir, 'tokenizer.model')
+
+            self.tokenizer = tokenizers.YouTokenToMeTokenizer(model_path=model_path)
 
             vocabulary = {}
             for i, piece in enumerate(self.tokenizer.tokenizer.vocab()):
