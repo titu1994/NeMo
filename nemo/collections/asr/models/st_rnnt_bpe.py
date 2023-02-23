@@ -231,9 +231,10 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         tensorboard_logs.update({'val_translations': translations, 'ground_truths': ground_truths})
 
         if self.global_rank == 0:
-            logging.info("-" * 80)
-            logging.info(f"Ground Truth: {ground_truths[0]}")
-            logging.info(f"Translation : {translations[0]}")
+            pass
+            # logging.info("-" * 80)
+            # logging.info(f"Ground Truth: {ground_truths[0]}")
+            # logging.info(f"Translation : {translations[0]}")
 
         self.log('global_step', torch.tensor(self.trainer.global_step, dtype=torch.float32))
 
@@ -241,12 +242,11 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         logs = self.validation_step(batch, batch_idx, dataloader_idx=dataloader_idx)
-        test_logs = {
-            'test_translations': logs['val_translations'],
-        }
-        if 'val_loss' in logs:
-            test_logs['test_loss'] = logs['val_loss']
-        return test_logs
+        keys = list(logs.keys())
+        for k in keys:
+            new_k = k.replace('val_', 'test_')
+            logs[new_k] = logs.pop(k)
+        return logs
 
     def multi_validation_epoch_end(self, outputs, dataloader_idx: int = 0):
         if not outputs:
@@ -308,8 +308,8 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
                 sb_score = sacre_bleu.score  # * self.world_size
 
-                logging.info(f"SB Score : {sb_score}")
-                logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
+                # logging.info(f"SB Score : {sb_score}")
+                # logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
             else:
                 sb_score = 0.0
 
