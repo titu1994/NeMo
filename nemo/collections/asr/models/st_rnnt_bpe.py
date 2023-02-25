@@ -262,7 +262,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             val_loss_log = {}
 
         sb_score = self._compute_sacrebleu_score(outputs, eval_mode='val')
-        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score}
+        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score}
         return {**val_loss_log, 'log': tensorboard_logs}
 
     def multi_test_epoch_end(self, outputs, dataloader_idx: int = 0):
@@ -279,7 +279,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             test_loss_log = {}
 
         sb_score = self._compute_sacrebleu_score(outputs, eval_mode='test')
-        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score}
+        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score}
         return {**test_loss_log, 'log': tensorboard_logs}
 
     def _compute_sacrebleu_score(self, outputs, eval_mode: str = 'val'):
