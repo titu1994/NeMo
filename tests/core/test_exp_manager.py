@@ -534,6 +534,61 @@ class TestExpManager:
         trainer.fit(model, ckpt_path=model_path)
 
     @pytest.mark.unit
+    def test_top_k_checkpoint_saved_max_mode(self, tmp_path):
+        max_steps = 64
+        tmp_path = tmp_path / "test_1"
+
+        class TestModel(ExampleModel):
+            def train_dataloader(self):
+                dataset = OnesDataset(64)
+                return torch.utils.data.DataLoader(dataset, batch_size=1)
+
+            def forward(self, batch):
+                output = self.l1(batch)
+                output = torch.nn.functional.l1_loss(output, torch.randn_like(output))
+                return output
+
+
+        trainer = pl.Trainer(
+            accelerator='cpu', enable_checkpointing=False, logger=False, max_steps=max_steps, val_check_interval=0.1
+        )
+        exp_manager(
+            trainer,
+            {
+                "explicit_log_dir": str(tmp_path),
+                'resume_if_exists': True,
+                'resume_ignore_no_checkpoint': True,
+                "checkpoint_callback_params": {"filename": f"{{val_loss:.4f}}-{{epoch}}-{{step}}",
+                                               "save_top_k": 3, "mode": "max", 'monitor': 'val_loss'}
+            },
+        )
+        torch.manual_seed(0)
+        model = TestModel()
+        trainer.fit(model)
+
+        checkpoint_dir = Path(str(tmp_path / "checkpoints"))
+        checkpoints = list(checkpoint_dir.glob("*.ckpt"))
+        for d in checkpoints:
+            print(d)
+        assert len(checkpoints) == 4
+
+        trainer = pl.Trainer(
+            accelerator='cpu', enable_checkpointing=False, logger=False, max_steps=max_steps * 2, val_check_interval=0.1
+        )
+        exp_manager(
+            trainer,
+            {
+                "explicit_log_dir": str(tmp_path),
+                'resume_if_exists': True,
+                'resume_ignore_no_checkpoint': False,
+                "checkpoint_callback_params": {"filename": f"{{val_loss:.4f}}-{{epoch}}-{{step}}",
+                                               "save_top_k": 2, "mode": "max", 'monitor': 'val_loss',}
+            },
+        )
+        model = TestModel()
+        trainer.fit(model)
+
+    @pytest.mark.unit
     def test_resume_checkpoint_skip_validation(self, tmp_path):
         """Test to ensure that when we resume from a checkpoint, we do not re-run validation unnecessarily."""
         tmp_path = tmp_path / "test_2"
