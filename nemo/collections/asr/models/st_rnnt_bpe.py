@@ -263,8 +263,8 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             val_loss_log = {}
 
         sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='val')
-        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score,
-                            'wer': wer, 'cer': cer}
+        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score,}
+                            # 'wer': wer, 'cer': cer}
         return {**val_loss_log, 'log': tensorboard_logs}
 
     def multi_test_epoch_end(self, outputs, dataloader_idx: int = 0):
@@ -281,8 +281,8 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
             test_loss_log = {}
 
         sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='test')
-        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score,
-                            'wer': wer, 'cer': cer}
+        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score,}
+                            # 'wer': wer, 'cer': cer}
         return {**test_loss_log, 'log': tensorboard_logs}
 
     def _compute_sacrebleu_score(self, outputs, eval_mode: str = 'val'):
@@ -316,12 +316,14 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 wer = word_error_rate(_translations, _ground_truths, use_cer=False)
                 cer = word_error_rate(_translations, _ground_truths, use_cer=True)
 
+                # logging.info(f"SB Score : {sb_score}")
+                # logging.info(f"WER Score: {wer}")
+                # logging.info(f"CER Score: {cer}")
+                # # logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
+                #
                 # for idx, (gt, tr) in enumerate(zip(_ground_truths, _translations)):
                 #     logging.info(f"{idx + 1:4d}: GT : {gt}")
                 #     logging.info(f"{idx + 1:4d}: TR : {tr}")
-
-                # logging.info(f"SB Score : {sb_score}")
-                # logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
             else:
                 sb_score = 0.0
                 wer = 0.0
@@ -329,7 +331,8 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
 
             # self.log(f"{eval_mode}_sacreBLEU", sb_score, sync_dist=True)
 
-        return sb_score, wer, cer
+        # return sb_score, wer, cer
+        return sb_score
 
     @classmethod
     def list_available_models(cls) -> List[PretrainedModelInfo]:
