@@ -1613,7 +1613,7 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
         else:
             raise ValueError(f"Unsupported attention pooling type {attn_pooling}.")
 
-        if activation not in ['relu', 'sigmoid', 'tanh']:
+        if activation not in ['relu', 'sigmoid', 'tanh', 'linear']:
             raise ValueError("Unsupported activation for joint step - please pass one of [relu, sigmoid, tanh]")
 
         activation = activation.lower()
@@ -1624,6 +1624,9 @@ class RNNTJoint(rnnt_abstract.AbstractRNNTJoint, Exportable, AdapterModuleMixin)
             activation = torch.nn.Sigmoid()
         elif activation == 'tanh':
             activation = torch.nn.Tanh()
+        elif activation == 'linear':
+            activation = torch.nn.Identity()
+
         self.attn_pool_activation = activation
 
         if attn_pooling.get('project_scores', False):
