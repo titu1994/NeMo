@@ -313,8 +313,8 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
                 sb_score = sacre_bleu.score  # * self.world_size
 
-                wer = word_error_rate(_translations, _ground_truths, use_cer=False)
-                cer = word_error_rate(_translations, _ground_truths, use_cer=True)
+                # wer = word_error_rate(_translations, _ground_truths, use_cer=False)
+                # cer = word_error_rate(_translations, _ground_truths, use_cer=True)
 
                 # logging.info(f"SB Score : {sb_score}")
                 # logging.info(f"WER Score: {wer}")
