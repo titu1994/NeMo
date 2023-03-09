@@ -697,6 +697,12 @@ class GreedyBatchedRNNTInfer(_GreedyRNNTInfer):
                     # This is accumulating blanks over all time steps T and all target steps min(max_symbols, U)
                     k_is_blank = k == self._blank_index
                     blank_mask.bitwise_or_(k_is_blank)
+
+                    # Remove duplicate tokens
+                    # if symbols_added > 0:
+                    #     same_labels = k == last_label[:, 0]
+                    #     blank_mask.bitwise_or_(same_labels)
+
                     all_blanks = torch.all(blank_mask)
 
                     del k_is_blank
