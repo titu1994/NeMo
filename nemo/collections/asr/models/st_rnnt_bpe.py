@@ -262,7 +262,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             val_loss_log = {}
 
-        sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='val')
+        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='val')
         tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score,}
                             # 'wer': wer, 'cer': cer}
         return {**val_loss_log, 'log': tensorboard_logs}
@@ -280,7 +280,7 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             test_loss_log = {}
 
-        sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='test')
+        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='test')
         tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score,}
                             # 'wer': wer, 'cer': cer}
         return {**test_loss_log, 'log': tensorboard_logs}
@@ -320,10 +320,10 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 # logging.info(f"WER Score: {wer}")
                 # logging.info(f"CER Score: {cer}")
                 # # logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
-                #
-                # for idx, (gt, tr) in enumerate(zip(_ground_truths, _translations)):
-                #     logging.info(f"{idx + 1:4d}: GT : {gt}")
-                #     logging.info(f"{idx + 1:4d}: TR : {tr}")
+
+                for idx, (gt, tr) in enumerate(zip(_ground_truths, _translations)):
+                    logging.info(f"{idx + 1:4d}: GT : {gt}")
+                    logging.info(f"{idx + 1:4d}: TR : {tr}")
             else:
                 sb_score = 0.0
                 wer = 0.0
