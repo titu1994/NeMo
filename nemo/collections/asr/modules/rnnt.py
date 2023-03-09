@@ -2090,8 +2090,8 @@ class SampledRNNTJoint(RNNTJoint):
 
         # Compute attention pooling if available
         if self.attn_pooling is not None:
-            f_scores = self.forward_attn_pooling_encoder(f)
-            g_scores = self.forward_attn_pooling_decoder(g)
+            f_scores = self.forward_attn_pooling_encoder(f)  # [B, T, 1, 1]
+            g_scores = self.forward_attn_pooling_decoder(g)  # [B, 1, U, 1]
             joint_scores = self.attn_pool_projection(torch.mul(f_scores, g_scores))
 
             # Add joint scores to joint hidden

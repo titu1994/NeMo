@@ -23,6 +23,7 @@ from sacrebleu import corpus_bleu
 
 from nemo.collections.asr.data.audio_to_text_dali import DALIOutputs
 from nemo.collections.asr.models.rnnt_bpe_models import EncDecRNNTBPEModel
+from nemo.collections.asr.metrics.wer import word_error_rate
 from nemo.core.classes import typecheck
 from nemo.core.classes.mixins import AccessMixin
 from nemo.core.classes.common import PretrainedModelInfo
@@ -261,8 +262,9 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             val_loss_log = {}
 
-        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='val')
-        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score}
+        sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='val')
+        tensorboard_logs = {**val_loss_log, 'val_sacreBLEU': sb_score, 'val_neg_sacreBLEU': -sb_score,
+                            'wer': wer, 'cer': cer}
         return {**val_loss_log, 'log': tensorboard_logs}
 
     def multi_test_epoch_end(self, outputs, dataloader_idx: int = 0):
@@ -278,12 +280,15 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
         else:
             test_loss_log = {}
 
-        sb_score = self._compute_sacrebleu_score(outputs, eval_mode='test')
-        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score}
+        sb_score, wer, cer = self._compute_sacrebleu_score(outputs, eval_mode='test')
+        tensorboard_logs = {**test_loss_log, 'test_sacreBLEU': sb_score, 'test_neg_sacreBLEU': -sb_score,
+                            'wer': wer, 'cer': cer}
         return {**test_loss_log, 'log': tensorboard_logs}
 
     def _compute_sacrebleu_score(self, outputs, eval_mode: str = 'val'):
         sb_score = 0.0
+        wer = 1.0
+        cer = 1.0
         for output in outputs:
             translations = list(itertools.chain(*[x[f'{eval_mode}_translations'] for x in output]))
             ground_truths = list(itertools.chain(*[x['ground_truths'] for x in output]))
@@ -308,14 +313,23 @@ class EncDecTranslationRNNTBPEModel(EncDecRNNTBPEModel):
                 sacre_bleu = corpus_bleu(_translations, [_ground_truths], tokenize="13a")
                 sb_score = sacre_bleu.score  # * self.world_size
 
+                wer = word_error_rate(_translations, _ground_truths, use_cer=False)
+                cer = word_error_rate(_translations, _ground_truths, use_cer=True)
+
+                # for idx, (gt, tr) in enumerate(zip(_ground_truths, _translations)):
+                #     logging.info(f"{idx + 1:4d}: GT : {gt}")
+                #     logging.info(f"{idx + 1:4d}: TR : {tr}")
+
                 # logging.info(f"SB Score : {sb_score}")
                 # logging.info(f"Sacre Bleu : {sacre_bleu.score}, World size : {self.world_size}")
             else:
                 sb_score = 0.0
+                wer = 0.0
+                cer = 0.0
 
             # self.log(f"{eval_mode}_sacreBLEU", sb_score, sync_dist=True)
 
-        return sb_score
+        return sb_score, wer, cer
 
     @classmethod
     def list_available_models(cls) -> List[PretrainedModelInfo]:
