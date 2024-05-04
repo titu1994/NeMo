@@ -123,6 +123,19 @@ def _prepare_default_adapter_config(*, global_key: str, meta_key: str, cfg: Dict
     return cfg
 
 
+def freeze_batchnorm_modules(m: nn.Module):
+    for mname, module in m.named_modules():
+        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            if hasattr(module, 'weight'):
+                module.weight.requires_grad_(False)
+            if hasattr(module, 'bias'):
+                module.bias.requires_grad_(False)
+            module.eval()
+            module.track_running_stats = False  # prevent running stats from updated during finetuning
+
+            logging.info(f"Froze module {mname}: {module}")
+
+
 class AdapterModuleMixin(ABC):
     """ Generic Adapter Mixin that can augment any torch.nn.Module with Adapter module support.
 
@@ -393,16 +406,7 @@ class AdapterModuleMixin(ABC):
                 will precisely yield the original (base) model's outputs.
         """
         if freeze_batchnorm:
-            for mname, module in self.named_modules():
-                if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
-                    if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(False)
-                    if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(False)
-                    module.eval()
-                    module.track_running_stats = False  # prevent running stats from updated during finetuning
-
-                    logging.info(f"Froze module {mname}: {module}")
+            freeze_batchnorm_modules(self)
 
         adapter_names = set([])
         for module in self.modules():  # access PT subclass method via inheritance

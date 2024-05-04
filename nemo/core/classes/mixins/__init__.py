@@ -22,6 +22,7 @@ from nemo.core.classes.mixins.adapter_mixin_strategies import (
 from nemo.core.classes.mixins.adapter_mixins import (
     AdapterModelPTMixin,
     AdapterModuleMixin,
+    freeze_batchnorm_modules,
     get_registered_adapter,
     register_adapter,
 )
