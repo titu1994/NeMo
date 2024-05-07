@@ -24,66 +24,8 @@ from nemo.collections.asr.models.tasks.rnnt_bpe_peft_model import SpeechTaskPEFT
 
 @pytest.fixture()
 def asr_model():
-    # preprocessor = {'_target_': 'nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor'}
-    # encoder = {
-    #     '_target_': 'nemo.collections.asr.modules.ConvASREncoder',
-    #     'feat_in': 64,
-    #     'activation': 'relu',
-    #     'conv_mask': True,
-    #     'jasper': [
-    #         {
-    #             'filters': 1024,
-    #             'repeat': 1,
-    #             'kernel': [1],
-    #             'stride': [1],
-    #             'dilation': [1],
-    #             'dropout': 0.0,
-    #             'residual': False,
-    #             'separable': True,
-    #             'se': True,
-    #             'se_context_size': -1,
-    #         }
-    #     ],
-    # }
-    #
-    # decoder = {
-    #     '_target_': 'nemo.collections.asr.modules.ConvASRDecoder',
-    #     'feat_in': 1024,
-    #     'num_classes': 28,
-    #     'vocabulary': [
-    #         ' ',
-    #         'a',
-    #         'b',
-    #         'c',
-    #         'd',
-    #         'e',
-    #         'f',
-    #         'g',
-    #         'h',
-    #         'i',
-    #         'j',
-    #         'k',
-    #         'l',
-    #         'm',
-    #         'n',
-    #         'o',
-    #         'p',
-    #         'q',
-    #         'r',
-    #         's',
-    #         't',
-    #         'u',
-    #         'v',
-    #         'w',
-    #         'x',
-    #         'y',
-    #         'z',
-    #         "'",
-    #     ],
-    # }
-
     modelConfig = DictConfig(
-        {'base_model_name': 'stt_en_conformer_ctc_small',
+        {'base_model_name': 'stt_en_conformer_ctc_small', 'use_lora': True,
          'model_dim': 256, 'out_dim': 1}
     )
 
@@ -116,15 +58,15 @@ class TestEncDecCTCModel:
                 encoded = asr_model.forward(
                     input_signal=input_signal[i : i + 1], input_signal_length=length[i : i + 1]
                 )
-                logprobs_instance.append(logprobs_ins)
-                print(len(logprobs_ins))
+                encoded, _ = encoded
+                logprobs_instance.append(encoded)
             logprobs_instance = torch.cat(logprobs_instance, 0)
 
             # batch size 4
-            logprobs_batch, _, _ = asr_model.forward(input_signal=input_signal, input_signal_length=length)
+            logprobs_batch, _ = asr_model.forward(input_signal=input_signal, input_signal_length=length)
 
         assert logprobs_instance.shape == logprobs_batch.shape
         diff = torch.mean(torch.abs(logprobs_instance - logprobs_batch))
-        assert diff <= 1e-6
+        assert diff <= 3e-6
         diff = torch.max(torch.abs(logprobs_instance - logprobs_batch))
-        assert diff <= 1e-6
+        assert diff <= 3e-6

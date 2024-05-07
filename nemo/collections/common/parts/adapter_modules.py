@@ -218,14 +218,13 @@ class LoraAdapter(nn.Module, AdapterModuleUtil):
     def reset_parameters(self):
         self.lora_A.reset_parameters()
 
-        self.lora_B.weight.data *= 0
+        self.lora_B.weight.data *= 0.0
         if self.lora_B.bias is not None:
-            self.lora_B.bias.data *= 0
+            self.lora_B.bias.data *= 0.0
 
     def forward(self, x):
         # Add dropout if available
-        if self.dropout is not None:
-            x = self.dropout(x)
+        x = self.dropout(x)
 
         x = self.lora_A(x)
         x = self.lora_B(x)

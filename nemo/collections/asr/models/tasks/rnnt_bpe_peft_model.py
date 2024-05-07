@@ -113,6 +113,12 @@ class SpeechTaskPEFTModel(ASRModel, ASRModuleMixin):
                             continue
                         print(f"Adding LoraAdapter to {name}")
 
+                        # freeze batch norm if any in the adapter submodules
+                        if isinstance(module, (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)):
+                            module.track_running_stats = (
+                                False  # prevent running stats from updated during finetuning
+                            )
+
                         input_dim, output_dim = extract_input_output_dims(module)
 
                         lora_cfg = LoraAdapterConfig(
@@ -126,28 +132,22 @@ class SpeechTaskPEFTModel(ASRModel, ASRModuleMixin):
                         # Add adapter to module
                         module.lora_adapter = self.from_config_dict(OmegaConf.structured(lora_cfg))
 
-                        # Update forward pass of module
-                        def lora_forward(self, *args, **kwargs):
-                            print("Calling custom forward")
-                            module_output = self.original_forward(*args, **kwargs)
+                        # # Update forward pass of module
+                        class ModuleWrapper(module.__class__):
+                            def forward(self, *args, **kwargs):
+                                # Get output of original module
+                                module_output = super().forward(*args, **kwargs)
 
-                            if len(args) > 0:
-                                ip = args[0]
-                            else:
-                                ip = kwargs[list(kwargs.keys())[0]]
+                                if len(args) > 0:
+                                    ip = args[0]
+                                else:
+                                    ip = kwargs[list(kwargs.keys())[0]]
 
-                            adapter_output = self.lora_adapter(ip)
-                            return module_output + adapter_output
+                                adapter_output = self.lora_adapter(ip)
+                                return module_output + adapter_output
 
-                        # Cache forward method and update to new forward
-                        print("Old", module.forward)
-                        module.original_forward = module.forward
-
-                        bound_method = lora_forward.__get__(module, module.__class__)
-                        setattr(module, 'forward', bound_method)
-
-                        # module.forward = lora_forward
-                        print("New", module.forward)
+                        # Update module class
+                        module.__class__ = ModuleWrapper
 
         # Add new modules
         self.output = torch.nn.Linear(self.cfg.model_dim, self.cfg.out_dim, bias=False)
@@ -372,7 +372,6 @@ class SpeechTaskPEFTModel(ASRModel, ASRModuleMixin):
             )
 
         encoded, encoded_len = self.base_model.encoder(audio_signal=processed_signal, length=processed_signal_length)
-
 
         return encoded, encoded_len
 
