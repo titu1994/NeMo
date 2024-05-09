@@ -43,6 +43,7 @@ class InternalTranscribeConfig:
     dtype: Optional[torch.dtype] = None
     training_mode: bool = False
     logging_level: Optional[Any] = None
+    use_chunked_inference: bool = False
 
     # Preprocessor values
     dither_value: float = 0.0
@@ -50,6 +51,17 @@ class InternalTranscribeConfig:
 
     # Scratch space
     temp_dir: Optional[str] = None
+
+
+@dataclass
+class AudioChunkConfig:
+    """
+    Configuration for audio chunking.
+    """
+
+    total_buffer_in_secs: float = -1.0
+    chunk_len_in_secs: float = -1.0
+    model_stride: int = -1
 
 
 @dataclass
@@ -62,6 +74,7 @@ class TranscribeConfig:
     verbose: bool = True
 
     # Utility
+    chunked_inference: Optional[AudioChunkConfig] = None
     partial_hypothesis: Optional[List[Any]] = None
 
     _internal: Optional[InternalTranscribeConfig] = None
@@ -267,6 +280,10 @@ class TranscriptionMixin(ABC):
                     "its subclass"
                 )
 
+        # Add Chunked Inference Config
+        if hasattr(transcribe_cfg, 'chunked_inference') and transcribe_cfg.chunked_inference is None:
+            transcribe_cfg.chunked_inference = AudioChunkConfig()
+
         # Hold the results here
         results = None  # type: GenericTranscriptionType
 
@@ -358,6 +375,10 @@ class TranscriptionMixin(ABC):
                     "its subclass"
                 )
 
+        # Add Chunked Inference Config
+        if hasattr(override_config, 'chunked_inference') and override_config.chunked_inference is None:
+            override_config.chunked_inference = AudioChunkConfig()
+
         transcribe_cfg = override_config
 
         try:
@@ -447,6 +468,13 @@ class TranscriptionMixin(ABC):
                 trcfg._internal.pad_to_value = self.preprocessor.featurizer.pad_to
                 self.preprocessor.featurizer.pad_to = 0
 
+        # Check for chunked inference
+        if hasattr(trcfg, 'chunked_inference') and trcfg.chunked_inference is not None:
+            use_chunked_inference = False
+            if trcfg.chunked_inference.total_buffer_in_secs > 0.0 and trcfg.chunked_inference.chunk_len_in_secs > 0.0:
+                use_chunked_inference = True
+            trcfg._internal.use_chunked_inference = use_chunked_inference
+
         # Switch model to evaluation mode
         self.eval()
 
@@ -476,9 +504,15 @@ class TranscriptionMixin(ABC):
         if isinstance(audio[0], str):
             audio_files = list(audio)
 
+            # Setup config for manifest processing
             tmp_dir = trcfg._internal.temp_dir
             ds_config = self._transcribe_input_manifest_processing(audio_files, tmp_dir, trcfg)
 
+            # Update config for buffered processing if requested
+            if trcfg._internal.use_chunked_inference:
+                ds_config = self._transcribe_input_buffered_processing(ds_config, tmp_dir, trcfg)
+
+            # Setup dataloader for manifest processing
             temp_dataloader = self._setup_transcribe_dataloader(ds_config)
             return temp_dataloader
 
@@ -493,9 +527,15 @@ class TranscriptionMixin(ABC):
                     for audio_tensor in audio_tensors
                 ]
 
+            # Setup config for tensor processing
             tmp_dir = trcfg._internal.temp_dir
             ds_config = self._transcribe_input_tensor_processing(audio_tensors, tmp_dir, trcfg)
 
+            # Update config for buffered processing if requested
+            if trcfg._internal.use_chunked_inference:
+                ds_config = self._transcribe_input_buffered_processing(ds_config, tmp_dir, trcfg)
+
+            # Setup dataloader for tensor processing
             temp_dataloader = self._setup_transcribe_tensor_dataloader(ds_config, trcfg)
             return temp_dataloader
 
@@ -546,6 +586,37 @@ class TranscriptionMixin(ABC):
         augmentor = get_value_from_transcription_config(trcfg, 'augmentor', None)
         if augmentor:
             ds_config['augmentor'] = augmentor
+
+        return ds_config
+
+    def _transcribe_input_buffered_processing(
+        self, ds_config: dict, temp_dir: str, trcfg: TranscribeConfig
+    ):
+        """
+        Internal function to process the input audio tensors and return a config dict for the dataloader.
+
+        Args:
+            ds_config: A config dict that is used to setup the dataloader for transcription, either manifest
+                or tensor based.
+            temp_dir: A temporary directory to store intermediate files.
+            trcfg: The transcription config dataclass. Subclasses can change this to a different dataclass if needed.
+
+        Returns:
+            A config dict that is used to setup the dataloader for transcription.
+        """
+
+        # Get additional arguments for buffered inference
+        if not hasattr(trcfg, 'chunked_inference'):
+            raise ValueError(
+                "Buffered inference is enabled but `chunked_inference` is not set in the transcription config."
+            )
+
+        chunked_inference_cfg = trcfg.chunked_inference
+        ds_config.update({
+            'total_buffer_in_secs': chunked_inference_cfg.total_buffer_in_secs,
+            'chunk_len_in_secs': chunked_inference_cfg.chunk_len_in_secs,
+            'model_stride': chunked_inference_cfg.model_stride,
+        })
 
         return ds_config
 
